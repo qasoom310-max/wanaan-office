@@ -9,6 +9,7 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Office\AgentModel;
 use App\Office\Erp\ErpClient;
+use App\Office\Seo\SeoClient;
 use App\Office\Team;
 use App\Office\Tools\AgentTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,6 +42,9 @@ class WebsitePlanTest extends TestCase
 
         $names = array_map(fn ($tool) => $tool->name, $team->toolsFor('it'));
         $this->assertContains('erp_limousine_trips', $names);
+        Setting::write(SeoClient::URL, 'https://seo.test');
+        Setting::write(SeoClient::KEY, 'seo_office_x');
+        $this->assertContains('seo_structure', array_map(fn ($tool) => $tool->name, $team->toolsFor('it')), 'The IT Manager follows the SEO system\'s rules.');
         $this->assertNotContains('erp_journal_entries', $names);
         $this->assertFalse($team->searchesWeb('it'), 'Research is the Gulf Planner\'s and Researcher\'s job.');
         $this->assertStringContainsString('"To confirm"', $team->get('it')['brief']);
