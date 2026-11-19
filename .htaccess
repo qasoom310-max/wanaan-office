@@ -1,0 +1,10 @@
+# Only used when the web address points at this folder instead of at public/.
+# Everything is sent into public/, so settings, the database and the code can never be downloaded.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+<FilesMatch "(^\.|\.sqlite$|\.lock$|\.json$|\.xml$|^artisan$)">
+    Require all denied
+</FilesMatch>

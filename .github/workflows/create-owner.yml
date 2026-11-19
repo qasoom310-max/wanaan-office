@@ -1,0 +1,41 @@
+name: Create the owner account (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Full name'
+        required: true
+      email:
+        description: 'Email they will log in with'
+        required: true
+
+jobs:
+  create:
+    name: Create the owner on office.wanaan-bh.com
+    runs-on: ubuntu-latest
+    env:
+      PHP_BIN: ${{ vars.PHP_BIN || 'php' }}
+      NAME: ${{ inputs.name }}
+      EMAIL: ${{ inputs.email }}
+
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Trust the server's SSH host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      # The one-time password is printed in this run's log; it must be changed at first login.
+      - name: Run office:owner
+        run: |
+          set -euo pipefail
+          case "$NAME" in (*[!A-Za-z0-9\ .-]*) echo "name: letters, digits, spaces, dots and dashes only"; exit 1;; esac
+          case "$EMAIL" in (*[!A-Za-z0-9@._+-]*) echo "email has characters that are not allowed"; exit 1;; esac
+          ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cd ${{ secrets.DEPLOY_PATH }} && $PHP_BIN artisan office:owner '$NAME' '$EMAIL'"
