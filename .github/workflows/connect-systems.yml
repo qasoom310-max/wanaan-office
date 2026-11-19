@@ -1,0 +1,85 @@
+name: Connect the ERP and the SEO system (manual)
+
+# Creates a read-only office key in the live ERP (every company) and in the live SEO
+# system (every project), and hands each key straight to the office on the server.
+# The keys never leave the server: they are never printed, so they are not in this log.
+
+on:
+  workflow_dispatch:
+    inputs:
+      erp:
+        description: 'Connect the ERP'
+        type: boolean
+        default: true
+      seo:
+        description: 'Connect the SEO system'
+        type: boolean
+        default: true
+
+jobs:
+  connect:
+    name: Connect office.wanaan-bh.com
+    runs-on: ubuntu-latest
+    env:
+      PHP_BIN: ${{ vars.PHP_BIN || 'php' }}
+      DO_ERP: ${{ inputs.erp }}
+      DO_SEO: ${{ inputs.seo }}
+
+    steps:
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Trust the server's SSH host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Create the keys and connect
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "PHP='$PHP_BIN' OFFICE='${{ secrets.DEPLOY_PATH }}' DO_ERP='$DO_ERP' DO_SEO='$DO_SEO' bash -s" <<'REMOTE'
+          set -uo pipefail
+
+          # The folder of the site whose .env says it lives at this address.
+          find_site() {
+            for env in "$HOME"/domains/*/public_html/.env "$HOME"/domains/*/public_html/*/.env "$HOME"/public_html/.env "$HOME"/public_html/*/.env; do
+              [ -f "$env" ] || continue
+              if grep -qE "^APP_URL=\"?https?://$1/?\"?$" "$env"; then dirname "$env"; return 0; fi
+            done
+            return 1
+          }
+
+          if [ "$DO_ERP" = "true" ]; then
+            ERP=$(find_site 'erp.wanaan-bh.com') || { echo "ERP folder not found on this server account."; exit 1; }
+            echo "ERP found."
+            IDS=$(cd "$ERP" && $PHP artisan tinker --execute='echo implode(" ", App\Models\Workspace::query()->pluck("id")->all());' 2>/dev/null | tr -cd '0-9 ')
+            ARGS=""; for id in $IDS; do ARGS="$ARGS --workspace=$id"; done
+            [ -n "$ARGS" ] || { echo "No ERP companies found."; exit 1; }
+            OUT=$(cd "$ERP" && $PHP artisan office:key create "AI office (office.wanaan-bh.com)" $ARGS 2>&1)
+            KEY=$(printf '%s\n' "$OUT" | grep -oE 'office_[0-9a-f]{64}' | head -1)
+            [ -n "$KEY" ] || { echo "The ERP did not create a key."; exit 1; }
+            printf '%s\n' "$OUT" | grep "may read"
+            (cd "$OFFICE" && OFFICE_ERP_KEY="$KEY" $PHP artisan office:connect-erp https://erp.wanaan-bh.com $ARGS) || exit 1
+            unset KEY OUT
+          fi
+
+          if [ "$DO_SEO" = "true" ]; then
+            SEO=$(find_site 'seo.wanaan-bh.com') || { echo "SEO folder not found on this server account."; exit 1; }
+            echo "SEO system found."
+            (cd "$SEO" && $PHP artisan migrate --force >/dev/null 2>&1)
+            IDS=$(cd "$SEO" && $PHP artisan tinker --execute='echo implode(" ", App\Models\Project::query()->pluck("id")->all());' 2>/dev/null | tr -cd '0-9 ')
+            ARGS=""; for id in $IDS; do ARGS="$ARGS --project=$id"; done
+            [ -n "$ARGS" ] || { echo "No SEO projects found."; exit 1; }
+            OUT=$(cd "$SEO" && $PHP artisan office:key create "AI office (office.wanaan-bh.com)" $ARGS 2>&1)
+            KEY=$(printf '%s\n' "$OUT" | grep -oE 'seo_office_[0-9a-f]{64}' | head -1)
+            [ -n "$KEY" ] || { echo "The SEO system did not create a key."; exit 1; }
+            printf '%s\n' "$OUT" | grep "may read"
+            (cd "$OFFICE" && OFFICE_SEO_KEY="$KEY" $PHP artisan office:connect-seo https://seo.wanaan-bh.com) || exit 1
+            unset KEY OUT
+          fi
+
+          echo "Done."
+          REMOTE
