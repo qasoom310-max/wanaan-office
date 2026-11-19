@@ -57,6 +57,11 @@ jobs:
             for dir in "$HOME"/domains/*/public_html "$HOME"/domains/*/public_html/* "$HOME"/public_html "$HOME"/public_html/*; do
               [ -f "$dir/artisan" ] && [ -f "$dir/$1" ] && { echo "$dir"; return 0; }
             done
+            # Anywhere else on the account (a few levels down), skipping vendor folders.
+            for art in $(find "$HOME" -maxdepth 6 -name artisan -type f -not -path '*/vendor/*' 2>/dev/null); do
+              dir=$(dirname "$art")
+              [ -f "$dir/$1" ] && { echo "$dir"; return 0; }
+            done
             return 1
           }
 
