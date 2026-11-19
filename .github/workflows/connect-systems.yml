@@ -19,6 +19,10 @@ on:
         description: 'Name of the ONE SEO project the IT Manager may write into (blank = read only)'
         required: false
         default: ''
+      create_project:
+        description: 'Create that SEO project if it does not exist yet (name only, no website address)'
+        type: boolean
+        default: false
 
 jobs:
   connect:
@@ -29,6 +33,7 @@ jobs:
       DO_ERP: ${{ inputs.erp }}
       DO_SEO: ${{ inputs.seo }}
       WRITE_NAME: ${{ inputs.seo_write_project }}
+      CREATE: ${{ inputs.create_project }}
 
     steps:
       - name: Setup SSH agent
@@ -45,7 +50,7 @@ jobs:
         run: |
           ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "PHP='$PHP_BIN' OFFICE='${{ secrets.DEPLOY_PATH }}' DO_ERP='$DO_ERP' DO_SEO='$DO_SEO' WRITE_NAME=$(printf '%q' "$WRITE_NAME") bash -s" <<'REMOTE'
+            "PHP='$PHP_BIN' OFFICE='${{ secrets.DEPLOY_PATH }}' DO_ERP='$DO_ERP' DO_SEO='$DO_SEO' CREATE='$CREATE' WRITE_NAME=$(printf '%q' "$WRITE_NAME") bash -s" <<'REMOTE'
           set -uo pipefail
 
           # The folder of the site whose .env says it lives at this address.
@@ -96,6 +101,11 @@ jobs:
             WRITE=""
             if [ -n "$WRITE_NAME" ]; then
               WRITE=$(cd "$SEO" && WRITE_NAME="$WRITE_NAME" $PHP artisan tinker --execute='echo App\Models\Project::query()->whereRaw("lower(name) = ?", [mb_strtolower(trim(getenv("WRITE_NAME")))])->value("id");' 2>/dev/null | tr -cd '0-9')
+              if [ -z "$WRITE" ] && [ "$CREATE" = "true" ]; then
+                WRITE=$(cd "$SEO" && WRITE_NAME="$WRITE_NAME" $PHP artisan tinker --execute='echo App\Models\Project::create(["name" => trim(getenv("WRITE_NAME"))])->id;' 2>/dev/null | tr -cd '0-9')
+                [ -n "$WRITE" ] && echo "Created the SEO project \"$WRITE_NAME\" (no website address yet)."
+                ARGS="$ARGS --project=$WRITE"
+              fi
               [ -n "$WRITE" ] || { echo "No SEO project named \"$WRITE_NAME\". Create it in the SEO system first."; exit 1; }
               echo "The IT Manager may write into project $WRITE only."
             fi
