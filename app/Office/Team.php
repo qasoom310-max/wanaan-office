@@ -111,6 +111,10 @@ class Team
         }
         if ($agent === 'it') {
             array_push($tools, ...$office->websitePlan());
+            // The one agent that may write into the SEO system, and only into the new website's project.
+            if (in_array('seo', $sources, true)) {
+                array_push($tools, ...app(SeoTools::class)->writing());
+            }
         }
 
         // Every agent may open files from its own conversation and ask the owner;

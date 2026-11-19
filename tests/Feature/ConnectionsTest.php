@@ -67,6 +67,27 @@ class ConnectionsTest extends TestCase
         Http::assertSent(fn (Request $request): bool => $request->method() === 'GET' && $request->hasHeader('Authorization', 'Bearer seo_office_test'));
     }
 
+    public function test_only_the_it_manager_writes_and_only_into_the_new_websites_project(): void
+    {
+        Setting::write(SeoClient::URL, 'https://seo.test');
+        Setting::write(SeoClient::KEY, 'seo_office_test');
+        $this->assertNotContains('seo_plan_article', $this->toolNames('it'), 'No write tools before a project is given.');
+
+        Setting::write(SeoClient::WRITE_PROJECT, '7');
+        Http::fake([
+            'seo.test/api/office/v1/projects/7/content' => Http::response(['id' => 3, 'subject' => 'Bahrain to Riyadh'], 201),
+            'seo.test/api/office/v1/projects/7/sections' => Http::response(['error' => 'already exists here (id 2).'], 409),
+        ]);
+
+        $this->assertContains('seo_plan_article', $this->toolNames('it'));
+        $this->assertNotContains('seo_plan_article', $this->toolNames('mkt'));
+
+        $tools = collect(app(Team::class)->toolsFor('it'))->keyBy('name');
+        $this->assertStringContainsString('"id":3', ($tools['seo_plan_article']->run)(['kind' => 'post', 'subject' => 'Bahrain to Riyadh', 'language' => 'en', 'topic_id' => 2, 'scheduled_on' => '2027-02-01']));
+        $this->assertStringContainsString('already exists', ($tools['seo_add_section']->run)(['name' => 'Airport transfers']));
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && str_contains($request->url(), '/projects/7/content') && $request['topic_id'] === 2);
+    }
+
     public function test_research_and_planning_search_the_web_and_searches_are_counted_in_spending(): void
     {
         $team = app(Team::class);

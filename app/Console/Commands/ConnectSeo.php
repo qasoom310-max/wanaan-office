@@ -15,7 +15,7 @@ use Illuminate\Console\Command;
  *
  *   OFFICE_SEO_KEY=seo_office_… php artisan office:connect-seo https://seo.wanaan-bh.com
  */
-#[Signature('office:connect-seo {url : the SEO system address}')]
+#[Signature('office:connect-seo {url : the SEO system address} {--write= : the one project id the key may also write into}')]
 #[Description('Connect the office to the SEO system (read-only) and list the projects it may read')]
 class ConnectSeo extends Command
 {
@@ -31,6 +31,8 @@ class ConnectSeo extends Command
 
         Setting::write(SeoClient::URL, rtrim((string) $this->argument('url'), '/'));
         Setting::write(SeoClient::KEY, $key);
+        $write = $this->option('write');
+        Setting::write(SeoClient::WRITE_PROJECT, is_string($write) && ctype_digit($write) ? $write : null);
 
         try {
             foreach ($seo->get('projects')['data'] ?? [] as $project) {

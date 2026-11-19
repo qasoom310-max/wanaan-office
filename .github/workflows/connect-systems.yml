@@ -15,6 +15,10 @@ on:
         description: 'Connect the SEO system'
         type: boolean
         default: true
+      seo_write_project:
+        description: 'Name of the ONE SEO project the IT Manager may write into (blank = read only)'
+        required: false
+        default: ''
 
 jobs:
   connect:
@@ -24,6 +28,7 @@ jobs:
       PHP_BIN: ${{ vars.PHP_BIN || 'php' }}
       DO_ERP: ${{ inputs.erp }}
       DO_SEO: ${{ inputs.seo }}
+      WRITE_NAME: ${{ inputs.seo_write_project }}
 
     steps:
       - name: Setup SSH agent
@@ -40,7 +45,7 @@ jobs:
         run: |
           ssh -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "PHP='$PHP_BIN' OFFICE='${{ secrets.DEPLOY_PATH }}' DO_ERP='$DO_ERP' DO_SEO='$DO_SEO' bash -s" <<'REMOTE'
+            "PHP='$PHP_BIN' OFFICE='${{ secrets.DEPLOY_PATH }}' DO_ERP='$DO_ERP' DO_SEO='$DO_SEO' WRITE_NAME=$(printf '%q' "$WRITE_NAME") bash -s" <<'REMOTE'
           set -uo pipefail
 
           # The folder of the site whose .env says it lives at this address.
@@ -71,6 +76,8 @@ jobs:
             IDS=$(cd "$ERP" && $PHP artisan tinker --execute='echo implode(" ", App\Models\Workspace::query()->pluck("id")->all());' 2>/dev/null | tr -cd '0-9 ')
             ARGS=""; for id in $IDS; do ARGS="$ARGS --workspace=$id"; done
             [ -n "$ARGS" ] || { echo "No ERP companies found."; exit 1; }
+            # The office's earlier key is switched off: one live key at a time.
+            (cd "$ERP" && $PHP artisan tinker --execute='App\Models\OfficeToken::query()->where("name", "AI office (office.wanaan-bh.com)")->whereNull("revoked_at")->update(["revoked_at" => now()]);' >/dev/null 2>&1)
             OUT=$(cd "$ERP" && $PHP artisan office:key create "AI office (office.wanaan-bh.com)" $ARGS 2>&1)
             KEY=$(printf '%s\n' "$OUT" | grep -oE 'office_[0-9a-f]{64}' | head -1)
             [ -n "$KEY" ] || { echo "The ERP did not create a key."; exit 1; }
@@ -86,11 +93,18 @@ jobs:
             IDS=$(cd "$SEO" && $PHP artisan tinker --execute='echo implode(" ", App\Models\Project::query()->pluck("id")->all());' 2>/dev/null | tr -cd '0-9 ')
             ARGS=""; for id in $IDS; do ARGS="$ARGS --project=$id"; done
             [ -n "$ARGS" ] || { echo "No SEO projects found."; exit 1; }
-            OUT=$(cd "$SEO" && $PHP artisan office:key create "AI office (office.wanaan-bh.com)" $ARGS 2>&1)
+            WRITE=""
+            if [ -n "$WRITE_NAME" ]; then
+              WRITE=$(cd "$SEO" && WRITE_NAME="$WRITE_NAME" $PHP artisan tinker --execute='echo App\Models\Project::query()->whereRaw("lower(name) = ?", [mb_strtolower(trim(getenv("WRITE_NAME")))])->value("id");' 2>/dev/null | tr -cd '0-9')
+              [ -n "$WRITE" ] || { echo "No SEO project named \"$WRITE_NAME\". Create it in the SEO system first."; exit 1; }
+              echo "The IT Manager may write into project $WRITE only."
+            fi
+            (cd "$SEO" && $PHP artisan tinker --execute='App\Models\OfficeKey::query()->where("name", "AI office (office.wanaan-bh.com)")->whereNull("revoked_at")->update(["revoked_at" => now()]);' >/dev/null 2>&1)
+            OUT=$(cd "$SEO" && $PHP artisan office:key create "AI office (office.wanaan-bh.com)" $ARGS ${WRITE:+--write=$WRITE} 2>&1)
             KEY=$(printf '%s\n' "$OUT" | grep -oE 'seo_office_[0-9a-f]{64}' | head -1)
             [ -n "$KEY" ] || { echo "The SEO system did not create a key."; exit 1; }
             printf '%s\n' "$OUT" | grep "may read"
-            (cd "$OFFICE" && OFFICE_SEO_KEY="$KEY" $PHP artisan office:connect-seo https://seo.wanaan-bh.com) || exit 1
+            (cd "$OFFICE" && OFFICE_SEO_KEY="$KEY" $PHP artisan office:connect-seo https://seo.wanaan-bh.com ${WRITE:+--write=$WRITE}) || exit 1
             unset KEY OUT
           fi
 

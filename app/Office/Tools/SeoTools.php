@@ -74,6 +74,49 @@ class SeoTools
         return ['rows' => array_slice($rows, 0, 1500), 'count' => min(count($rows), 1500), 'complete' => $after === null];
     }
 
+    /**
+     * Writing into the one project the office may plan (the new website): sections and
+     * main pages, and articles on the calendar. Only the IT Manager gets these.
+     *
+     * @return list<AgentTool>
+     */
+    public function writing(): array
+    {
+        $project = $this->seo->writeProject();
+        if ($project === null) {
+            return [];
+        }
+        $note = " Only in project {$project} (the new website); never in any other.";
+
+        return [
+            new AgentTool('seo_add_section', 'Add a section (no parent) or a main page inside a section (give parent_id) to the new website\'s structure in the SEO system.'.$note,
+                ['type' => 'object', 'properties' => ['name' => ['type' => 'string'], 'parent_id' => ['type' => 'integer', 'description' => 'The section this main page belongs to; leave out for a section.']], 'required' => ['name']],
+                fn (array $in): string => 'Adding to the website structure: '.mb_substr((string) $in['name'], 0, 60),
+                fn (array $in): string => $this->json($this->seo->write('POST', 'sections', array_filter(['name' => $in['name'], 'parent_id' => $in['parent_id'] ?? null], fn ($v): bool => $v !== null)))),
+            new AgentTool('seo_rename_section', 'Rename a section or main page of the new website.'.$note,
+                ['type' => 'object', 'properties' => ['id' => ['type' => 'integer'], 'name' => ['type' => 'string']], 'required' => ['id', 'name']],
+                fn (): string => 'Renaming a section',
+                fn (array $in): string => $this->json($this->seo->write('PATCH', 'sections/'.(int) $in['id'], ['name' => $in['name']]))),
+            new AgentTool('seo_plan_article', 'Plan a piece on the new website\'s calendar, by the SEO system\'s rules: kind post (blog post, must give topic_id of its main page), page (service or main page), section or meta; language en or ar; country one of bhr, sau, are, kwt, qat, omn, egy, jor, ind, gbr, usa; a date from today on. Plan months ahead.'.$note,
+                ['type' => 'object', 'properties' => [
+                    'kind' => ['type' => 'string', 'enum' => ['post', 'page', 'section', 'meta']],
+                    'subject' => ['type' => 'string'], 'keyword' => ['type' => 'string'],
+                    'language' => ['type' => 'string', 'enum' => ['en', 'ar']],
+                    'country' => ['type' => 'string', 'enum' => ['bhr', 'sau', 'are', 'kwt', 'qat', 'omn', 'egy', 'jor', 'ind', 'gbr', 'usa']],
+                    'topic_id' => ['type' => 'integer', 'description' => 'The main page this piece leads to (required for a blog post).'],
+                    'facts' => ['type' => 'string', 'description' => 'Facts the writer must use.'],
+                    'instructions' => ['type' => 'string', 'description' => 'How it should be written, and which pages it must link to.'],
+                    'scheduled_on' => ['type' => 'string', 'description' => 'YYYY-MM-DD.'],
+                ], 'required' => ['kind', 'subject', 'language', 'scheduled_on']],
+                fn (array $in): string => 'Planning on the calendar: '.mb_substr((string) $in['subject'], 0, 60),
+                fn (array $in): string => $this->json($this->seo->write('POST', 'content', array_filter($in, fn ($v): bool => $v !== null && $v !== '')))),
+            new AgentTool('seo_move_article', 'Move a planned piece of the new website to another date (only while it is still planned).'.$note,
+                ['type' => 'object', 'properties' => ['id' => ['type' => 'integer'], 'scheduled_on' => ['type' => 'string', 'description' => 'YYYY-MM-DD.']], 'required' => ['id', 'scheduled_on']],
+                fn (): string => 'Moving a planned piece',
+                fn (array $in): string => $this->json($this->seo->write('PATCH', 'content/'.(int) $in['id'], ['scheduled_on' => $in['scheduled_on']]))),
+        ];
+    }
+
     private function json(mixed $value): string
     {
         return (string) json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
