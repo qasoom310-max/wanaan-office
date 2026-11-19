@@ -7,6 +7,7 @@ use App\Models\Fact;
 use App\Models\Idea;
 use App\Models\Message;
 use App\Models\MessageFile;
+use App\Models\PlanPage;
 use App\Models\Question;
 use App\Office\Spending;
 use App\Office\Team;
@@ -61,6 +62,64 @@ class OfficeTools
                         'work_by_agent' => AgentRun::where('created_at', '>=', $since)->selectRaw('agent, count(*) as answers, sum(status = ?) as failed', [AgentRun::FAILED])->groupBy('agent')->get()
                             ->map(fn ($row): array => ['agent' => $this->team->label($row->agent), 'answers' => (int) $row->answers, 'failed' => (int) $row->failed])->all(),
                     ]);
+                }),
+        ];
+    }
+
+    /**
+     * The website plan: read it, and add or change pages. A changed approved page goes
+     * back to "Planned" so the owner approves it again as it now is.
+     *
+     * @return list<AgentTool>
+     */
+    public function websitePlan(): array
+    {
+        return [
+            new AgentTool('office_plan_list', 'The website plan as it stands: every page with its status (Planned, Changes asked, Approved, Being built, Built, Live) and the owner\'s notes.',
+                ['type' => 'object', 'properties' => new \stdClass],
+                fn (): string => 'Opening the website plan',
+                fn (): string => $this->json(PlanPage::orderBy('sort')->orderBy('id')->get()
+                    ->map(fn (PlanPage $page): array => ['id' => $page->id, 'title' => $page->title, 'path' => $page->path, 'purpose' => $page->purpose, 'audience' => $page->audience, 'content' => $page->content, 'status' => $page->statusName(), 'owner_note' => $page->owner_note, 'order' => $page->sort])->all())),
+            new AgentTool('office_plan_save', 'Add a page to the website plan, or change one (give its id). Describe everything the page shows, section by section, and every rule it follows. Changing an approved page sends it back to the owner for approval.',
+                ['type' => 'object', 'properties' => [
+                    'id' => ['type' => 'integer', 'description' => 'The page to change; leave out to add a new page.'],
+                    'title' => ['type' => 'string', 'description' => 'The page name, e.g. "Book a ride".'],
+                    'path' => ['type' => 'string', 'description' => 'Its address, e.g. /book.'],
+                    'purpose' => ['type' => 'string', 'description' => 'Why the page exists, in one or two sentences.'],
+                    'audience' => ['type' => 'string', 'description' => 'Who uses it.'],
+                    'content' => ['type' => 'string', 'description' => 'Everything on the page, section by section: texts, fields, buttons, rules, languages, what happens next.'],
+                    'order' => ['type' => 'integer', 'description' => 'Its place in the plan (1 = first).'],
+                ], 'required' => ['title', 'purpose', 'content']],
+                fn (array $in): string => isset($in['id']) ? 'Updating a page of the website plan' : 'Adding a page to the website plan',
+                function (array $in): string {
+                    $fields = [
+                        'title' => mb_substr(trim((string) $in['title']), 0, 150),
+                        'path' => isset($in['path']) ? mb_substr(trim((string) $in['path']), 0, 150) : null,
+                        'purpose' => mb_substr(trim((string) $in['purpose']), 0, 2000),
+                        'audience' => isset($in['audience']) ? mb_substr(trim((string) $in['audience']), 0, 150) : null,
+                        'content' => mb_substr(trim((string) $in['content']), 0, 20000),
+                        'sort' => (int) ($in['order'] ?? 0),
+                    ];
+
+                    if (isset($in['id'])) {
+                        $page = PlanPage::find((int) $in['id']);
+                        if ($page === null) {
+                            return 'No page with that id.';
+                        }
+                        if (in_array($page->status, ['building', 'built', 'live'], true)) {
+                            return 'Not changed: "'.$page->title.'" is already '.mb_strtolower($page->statusName()).'. Ask the owner in the chat before changing it.';
+                        }
+                        $page->update([...$fields, 'status' => 'planned', 'approved_at' => null]);
+
+                        return 'Updated "'.$page->title.'"; it waits for the owner\'s approval.';
+                    }
+
+                    if (PlanPage::get()->contains(fn (PlanPage $page): bool => self::sameQuestion($page->title, $fields['title']))) {
+                        return 'Not added: a page like "'.$fields['title'].'" is already in the plan. Change that one instead (give its id).';
+                    }
+                    PlanPage::create([...$fields, 'status' => 'planned']);
+
+                    return 'Added "'.$fields['title'].'" to the website plan; it waits for the owner\'s approval.';
                 }),
         ];
     }

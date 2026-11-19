@@ -109,6 +109,9 @@ class Team
         if (in_array('office', $sources, true)) {
             array_push($tools, ...$office->reading());
         }
+        if ($agent === 'it') {
+            array_push($tools, ...$office->websitePlan());
+        }
 
         // Every agent may open files from its own conversation and ask the owner;
         // managers and IT may also ask IT for improvements.

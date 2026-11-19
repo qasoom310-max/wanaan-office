@@ -7,6 +7,7 @@ use App\Http\Controllers\IdeaController;
 use App\Http\Controllers\NameController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\PasswordController;
+use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StateController;
@@ -33,12 +34,14 @@ Route::middleware(['auth', EnsurePasswordChanged::class])->group(function () {
     Route::get('facts', [FactController::class, 'index'])->name('facts');
     Route::get('questions', [QuestionController::class, 'index'])->name('questions');
     Route::get('it', [IdeaController::class, 'index'])->name('ideas');
+    Route::get('website-plan', [PlanController::class, 'index'])->name('plan');
 
     Route::middleware('can:owner')->group(function () {
         Route::post('office/names', [NameController::class, 'store'])->name('names.store');
         Route::post('facts', [FactController::class, 'store'])->name('facts.store');
         Route::post('questions/{question}/answer', [QuestionController::class, 'answer'])->name('questions.answer');
         Route::post('it/{idea}', [IdeaController::class, 'decide'])->name('ideas.decide');
+        Route::post('website-plan/{page}', [PlanController::class, 'decide'])->name('plan.decide');
         Route::get('settings', [SettingsController::class, 'edit'])->name('settings');
         Route::put('settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::put('settings/budget', [SettingsController::class, 'budget'])->name('settings.budget');
