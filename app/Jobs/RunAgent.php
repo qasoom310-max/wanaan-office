@@ -46,8 +46,10 @@ class RunAgent implements ShouldQueue
             $run->moveTo('Reading your message', 1, $total);
 
             $run->moveTo('Reading the facts and the conversation', 2, $total);
-            $system = $instructions->for($run->agent, $run->channel, $run->meeting, $spending->modeFor($run->agent));
-            $conversation = $instructions->conversation($run->agent, $run->channel, $run->owner_id);
+            $system = $instructions->office();
+            $conversation = $instructions->conversation($run->channel, $run->owner_id);
+            // The agent's own part goes last, after the shared (cached) conversation.
+            $conversation[] = ['role' => 'system', 'content' => $instructions->agent($run->agent, $run->channel, $run->meeting, $spending->modeFor($run->agent))];
 
             // Spending rules: everyone speaks less near the budget, employees stop at it,
             // managers may use the reserve above it only when needed, nobody goes past it.
@@ -95,7 +97,12 @@ class RunAgent implements ShouldQueue
                 $run->moveTo($label, $step, $total);
             }, $limits);
 
-            $run->update(['input_tokens' => $reply['input_tokens'], 'output_tokens' => $reply['output_tokens']]);
+            $run->update([
+                'input_tokens' => $reply['input_tokens'],
+                'output_tokens' => $reply['output_tokens'],
+                'cache_write_tokens' => $reply['cache_write_tokens'] ?? 0,
+                'cache_read_tokens' => $reply['cache_read_tokens'] ?? 0,
+            ]);
 
             // In a meeting, an agent with nothing to add only marks the message read.
             if ($run->meeting && self::isJustRead($reply['text'])) {

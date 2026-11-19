@@ -7,22 +7,23 @@ use App\Models\Fact;
 use App\Models\Message;
 
 /**
- * What an agent is told before it answers: who it is, the office's rules, what data it
- * really has, the confirmed facts, and the conversation so far.
+ * What an agent is told before it answers, laid out for prompt caching:
+ *
+ * 1. office(): the office's rules and every confirmed fact — word for word the same for
+ *    every agent, so it is cached once and reused by all of them;
+ * 2. conversation(): the chat so far, also the same for every agent reading it (each
+ *    message labelled with who wrote it), cached up to its last message;
+ * 3. agent(): who this agent is, what it can see, the budget and its own spending —
+ *    small, sent last, so it never breaks the cached part above it.
  */
 class Instructions
 {
-    public function __construct(private Team $team) {}
+    public function __construct(private Team $team, private Spending $spending) {}
 
-    public function for(string $agent, string $channel, bool $meeting = false, string $budget = Spending::NORMAL): string
+    public function office(): string
     {
-        $profile = $this->team->get($agent);
-        $name = $this->team->nameOf($agent);
-
         $lines = [
-            'You work in the Wanaan AI office. Wanaan is a business in Bahrain with a Rent A Car section, a Limousine section, a shop and accounting, run on its own ERP.',
-            '',
-            'You are the '.$profile['title'].($name !== null ? ', named '.$name : '').'. '.$profile['brief'],
+            'You work in the Wanaan AI office. Wanaan is a business in Bahrain with a Rent A Car section, a Limousine section, a shop and accounting, run on its own ERP. The office is a team of AI agents, each with its own job; the owner leads it.',
             '',
             'Office rules:',
             '- The owner decides. You recommend; you never approve payments, change records or publish anything yourself.',
@@ -30,44 +31,19 @@ class Instructions
             '- Say what you do not know. Never invent numbers, names, dates or records.',
             '- When you need information only the owner can give, ask one clear question.',
             '- When the owner decides something you think is wrong or risky for your area, say so plainly: what worries you, why, and what you would do instead. Speaking up is part of your job; once the owner has heard you, the owner decides.',
+            '- The team shares one monthly AI budget. Whoever has the most important work uses most of it; nobody wastes it. Be ready to defend what you spend with what your work achieved.',
+            '- In the conversation, every message starts with who wrote it in [brackets]. Messages labelled with your own name and title are yours.',
+            '',
+            'Facts the owner has confirmed (true; never ask about them again):',
         ];
 
-        if (in_array('erp', $this->team->connectedSources($agent), true)) {
-            $lines[] = '- You can read the Wanaan ERP through your erp_ tools (read-only). Look before you speak: base every figure on what the tools return, name the company and the period, and say when a list was cut short. Start with erp_companies.';
-        } else {
-            $lines[] = '- You are not connected to any company data yet. You can talk, plan and give general advice, but say plainly that you cannot see the real records, and never present a figure as Wanaan\'s own.';
-        }
-
-        if ($meeting) {
-            array_push($lines,
-                '',
-                'This is a team meeting in the Everyone chat. The owner\'s last message is for the whole team, and every agent takes a turn, in order.',
-                '- Read it as it touches YOUR job. If it does: say in a few sentences what you will do about it, or, if you disagree, argue your case with reasons.',
-                '- You may agree or disagree with colleagues who spoke before you. Do not repeat what they already said.',
-                '- If it does not touch your job and you have nothing important to add, reply with exactly: '.RunAgent::READ_ONLY_REPLY,
-            );
-        } else {
-            $lines[] = $channel === Message::EVERYONE
-                ? '- This is the Everyone chat: the whole team reads it. The owner asked you by name.'
-                : '- This is a private chat with the owner. Do not repeat it in the Everyone chat.';
-        }
-
-        $facts = Fact::orderBy('id')->get()
-            ->filter(fn (Fact $fact): bool => $fact->agents === null || $fact->agents === [] || in_array($agent, $fact->agents, true));
-
-        $lines[] = '';
-        $lines[] = 'Facts the owner has confirmed (true, never ask about them again):';
+        $facts = Fact::orderBy('id')->get();
         if ($facts->isEmpty()) {
             $lines[] = '- None yet.';
         }
         foreach ($facts as $fact) {
-            $lines[] = '- '.$fact->text;
-        }
-
-        if ($budget === Spending::TIGHT) {
-            array_push($lines, '', 'This month\'s AI budget is nearly used. Speak less: answer in a few short sentences, look things up only when the answer needs it, and still finish what you were asked to do.');
-        } elseif ($budget === Spending::RESERVE) {
-            array_push($lines, '', 'This month\'s AI budget is used up. As a manager you may use a small reserve, but only for what really cannot wait: answer in two or three sentences, look up only what is essential, and tell the owner briefly that you are on the reserve.'.($meeting ? ' In this meeting, unless the message truly needs your answer now, reply with exactly '.RunAgent::READ_ONLY_REPLY.'.' : ''));
+            $for = $fact->agents ? ' (for '.implode(', ', array_map(fn (string $agent): string => $this->team->exists($agent) ? $this->team->title($agent) : $agent, $fact->agents)).')' : '';
+            $lines[] = '- '.$fact->text.$for;
         }
 
         $lines[] = '';
@@ -77,12 +53,12 @@ class Instructions
     }
 
     /**
-     * The conversation as the agent sees it: its own messages as its turns, everyone
-     * else's as the other side, each labelled with who wrote it.
+     * The chat so far as the other side of the conversation, every message labelled,
+     * with a cache marker on the last one.
      *
-     * @return list<array{role: 'user'|'assistant', content: string}>
+     * @return list<array{role: 'user', content: list<array<string, mixed>>}>
      */
-    public function conversation(string $agent, string $channel, ?int $ownerId): array
+    public function conversation(string $channel, ?int $ownerId): array
     {
         $messages = Message::with('user')->where('channel', $channel)
             ->when($ownerId === null, fn ($query) => $query->whereNull('owner_id'), fn ($query) => $query->where('owner_id', $ownerId))
@@ -90,19 +66,59 @@ class Instructions
 
         $turns = [];
         foreach ($messages as $message) {
-            $mine = $message->agent === $agent;
-            $author = $message->isFromAgent() ? $this->team->label($message->agent) : ($message->user?->name ?? 'Someone');
-            $turns[] = [
-                'role' => $mine ? 'assistant' : 'user',
-                'content' => $mine ? $message->body : "[{$author}] {$message->body}",
-            ];
+            $author = $message->isFromAgent() ? $this->team->label($message->agent) : ($message->user?->name ?? 'Someone').' (owner)';
+            $turns[] = ['role' => 'user', 'content' => [['type' => 'text', 'text' => "[{$author}] {$message->body}"]]];
         }
 
-        // The conversation must open with the other side.
-        while ($turns !== [] && $turns[0]['role'] === 'assistant') {
-            array_shift($turns);
+        if ($turns !== []) {
+            $last = count($turns) - 1;
+            $turns[$last]['content'][0]['cacheControl'] = ['type' => 'ephemeral'];
         }
 
         return $turns;
+    }
+
+    /**
+     * The part only this agent gets, sent after the conversation.
+     */
+    public function agent(string $agent, string $channel, bool $meeting = false, string $budget = Spending::NORMAL): string
+    {
+        $profile = $this->team->get($agent);
+
+        $lines = [
+            'You are '.$this->team->label($agent).'. '.$profile['brief'],
+            ($this->spending->isManager($agent) ? 'You are a manager.' : 'You are an employee.').' Answer now, as '.$this->team->label($agent).', to the latest message.',
+        ];
+
+        if (in_array('erp', $this->team->connectedSources($agent), true)) {
+            $lines[] = 'You can read the Wanaan ERP through your erp_ tools (read-only). Look before you speak: base every figure on what the tools return, name the company and the period, and say when a list was cut short. Start with erp_companies.';
+        } else {
+            $lines[] = 'You are not connected to any company data yet. You can talk, plan and give general advice, but say plainly that you cannot see the real records, and never present a figure as Wanaan\'s own.';
+        }
+
+        if ($meeting) {
+            array_push($lines,
+                'This is a team meeting in the Everyone chat. The owner\'s last message is for the whole team, and every agent takes a turn, in order.',
+                'Read it as it touches YOUR job. If it does: say in a few sentences what you will do about it, or, if you disagree, argue your case with reasons. You may agree or disagree with colleagues who spoke before you; do not repeat what they already said.',
+                'If it does not touch your job and you have nothing important to add, reply with exactly: '.RunAgent::READ_ONLY_REPLY,
+            );
+        } else {
+            $lines[] = $channel === Message::EVERYONE
+                ? 'This is the Everyone chat: the whole team reads it. The owner asked you by name.'
+                : 'This is a private chat with the owner. Do not repeat it in the Everyone chat.';
+        }
+
+        $month = $this->spending->thisMonth();
+        $mine = $this->spending->agentThisMonth($agent);
+        $lines[] = sprintf('Your AI spending this month: $%.2f, %d%% of the team\'s $%.2f.', $mine, $month > 0 ? round($mine / $month * 100) : 0, $month);
+
+        if ($budget === Spending::TIGHT) {
+            $lines[] = 'This month\'s AI budget is nearly used. Speak less: answer in a few short sentences, look things up only when the answer needs it, and still finish what you were asked to do.';
+        } elseif ($budget === Spending::RESERVE) {
+            $lines[] = 'This month\'s AI budget is used up. As a manager you may use a small reserve, but only for what really cannot wait: answer in two or three sentences, look up only what is essential, and tell the owner briefly that you are on the reserve.'
+                .($meeting ? ' In this meeting, unless the message truly needs your answer now, reply with exactly '.RunAgent::READ_ONLY_REPLY.'.' : '');
+        }
+
+        return implode("\n", $lines);
     }
 }

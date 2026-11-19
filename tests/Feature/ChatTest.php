@@ -67,8 +67,8 @@ class ChatTest extends TestCase
     {
         $owner = User::factory()->owner()->create();
         $this->model->answerWith = fn (string $instructions): string => match (true) {
-            str_contains($instructions, 'You are the Main Accountant') => 'I disagree: cash payments make the books harder to check.',
-            str_contains($instructions, 'You are the Rent A Car Manager') => 'I agree with the accountant, and deposits need receipts too.',
+            str_contains($instructions, 'You are Main Accountant.') => 'I disagree: cash payments make the books harder to check.',
+            str_contains($instructions, 'You are Rent A Car Manager.') => 'I agree with the accountant, and deposits need receipts too.',
             default => 'READ',
         };
 
@@ -86,6 +86,23 @@ class ChatTest extends TestCase
 
         $this->actingAs($owner)->getJson(route('office.state'))
             ->assertJsonCount(count($agents), 'reads.'.Message::where('body', 'From Sunday we accept cash only.')->value('id'));
+    }
+
+    public function test_every_agent_in_a_meeting_gets_the_same_cached_rules_and_conversation_and_its_own_part_last(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $this->model->answer = 'READ';
+
+        $this->send($owner, 'everyone', 'Team, we open a branch in Riyadh.');
+
+        $this->assertCount(1, array_unique($this->model->systems), 'The shared rules are word for word the same for every agent.');
+        $raw = $this->model->rawMessages;
+        $this->assertSame('system', end($raw)['role']);
+        $this->assertStringContainsString('You are Gulf Planner', end($raw)['content']);
+        $this->assertStringContainsString('Your AI spending this month', end($raw)['content']);
+        $beforeOwn = $raw[count($raw) - 2];
+        $this->assertSame(['type' => 'ephemeral'], $beforeOwn['content'][0]['cacheControl']);
+        $this->assertStringStartsWith('[', $beforeOwn['content'][0]['text']);
     }
 
     public function test_an_at_mention_in_everyone_asks_only_that_agent(): void
@@ -135,7 +152,7 @@ class ChatTest extends TestCase
         $this->send($owner, 'direct:rent', 'When do deposits go back?');
 
         $this->assertStringContainsString('Deposits are refunded within 7 days.', $this->model->lastInstructions);
-        $this->assertStringNotContainsString('Only for the planner.', $this->model->lastInstructions);
+        $this->assertStringContainsString('Only for the planner. (for Gulf Planner)', $this->model->lastInstructions);
         $this->assertStringContainsString('not connected to any company data yet', $this->model->lastInstructions);
         $this->assertSame('user', $this->model->lastMessages[0]['role']);
         $this->assertStringContainsString('When do deposits go back?', end($this->model->lastMessages)['content']);

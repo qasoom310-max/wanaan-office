@@ -47,12 +47,16 @@ class ClaudeAgentModel implements AgentModel
 
         $inputTokens = 0;
         $outputTokens = 0;
+        $cacheWrite = 0;
+        $cacheRead = 0;
 
         for ($round = 0; $round <= $maxRounds; $round++) {
             // On the last round no tools are offered, so the agent must answer with what it has.
             $response = $this->send($instructions, $messages, $round < $maxRounds ? $definitions : [], $effort);
             $inputTokens += (int) $response->usage->inputTokens;
             $outputTokens += (int) $response->usage->outputTokens;
+            $cacheWrite += (int) ($response->usage->cacheCreationInputTokens ?? 0);
+            $cacheRead += (int) ($response->usage->cacheReadInputTokens ?? 0);
 
             if ($response->stopReason === 'refusal') {
                 throw new AgentProblem('the AI declined this request');
@@ -69,7 +73,13 @@ class ClaudeAgentModel implements AgentModel
                     throw new AgentProblem('the AI returned an empty answer');
                 }
 
-                return ['text' => trim($text), 'input_tokens' => $inputTokens, 'output_tokens' => $outputTokens];
+                return [
+                    'text' => trim($text),
+                    'input_tokens' => $inputTokens,
+                    'output_tokens' => $outputTokens,
+                    'cache_write_tokens' => $cacheWrite,
+                    'cache_read_tokens' => $cacheRead,
+                ];
             }
 
             $results = [];
@@ -125,10 +135,13 @@ class ClaudeAgentModel implements AgentModel
             return (new Client(apiKey: $this->apiKey))->beta->messages->create(
                 model: config('office.model'),
                 maxTokens: self::MAX_TOKENS,
-                system: $instructions,
+                // The office rules and facts are the same for every agent: cached once.
+                system: [['type' => 'text', 'text' => $instructions, 'cacheControl' => ['type' => 'ephemeral']]],
                 messages: $messages,
                 tools: $tools,
                 outputConfig: ['effort' => $effort],
+                // Each lookup round re-reads everything before it: cache up to the newest block.
+                cacheControl: ['type' => 'ephemeral'],
                 // If a safety filter declines, the API retries on another model by itself.
                 fallbacks: 'default',
                 betas: ['server-side-fallback-2026-07-01'],

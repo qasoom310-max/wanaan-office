@@ -11,10 +11,11 @@
 return [
     'model' => 'claude-opus-5-5',
 
-    // US dollars per million tokens [input, output], to estimate spending. Update when
-    // Anthropic changes its prices; the exact bill is in the Anthropic console.
+    // US dollars per million tokens: input, output, writing to the cache (5-minute) and
+    // reading from it. Update when Anthropic changes its prices; the exact bill is in
+    // the Anthropic console.
     'prices' => [
-        'claude-opus-5-5' => [4.00, 20.00],
+        'claude-opus-5-5' => ['input' => 4.00, 'output' => 20.00, 'cache_write' => 5.00, 'cache_read' => 0.20],
     ],
 
     // From this share of the monthly budget, every agent speaks less.

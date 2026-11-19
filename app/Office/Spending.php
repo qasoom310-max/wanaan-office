@@ -27,19 +27,34 @@ class Spending
     /** No more spending for this agent until the owner raises the budget. */
     public const STOPPED = 'stopped';
 
-    public function costOf(int $inputTokens, int $outputTokens): float
-    {
-        [$in, $out] = config('office.prices')[config('office.model')] ?? [0, 0];
+    private const SUMS = 'coalesce(sum(input_tokens), 0) as input, coalesce(sum(output_tokens), 0) as output, coalesce(sum(cache_write_tokens), 0) as cache_write, coalesce(sum(cache_read_tokens), 0) as cache_read';
 
-        return ($inputTokens * $in + $outputTokens * $out) / 1_000_000;
+    public function costOf(int $inputTokens, int $outputTokens, int $cacheWriteTokens = 0, int $cacheReadTokens = 0): float
+    {
+        $price = config('office.prices')[config('office.model')] ?? [];
+
+        return ($inputTokens * ($price['input'] ?? 0)
+            + $outputTokens * ($price['output'] ?? 0)
+            + $cacheWriteTokens * ($price['cache_write'] ?? 0)
+            + $cacheReadTokens * ($price['cache_read'] ?? 0)) / 1_000_000;
     }
 
-    public function since(Carbon $from): float
+    private function costOfRow(object $row): float
     {
-        $tokens = AgentRun::where('created_at', '>=', $from)
-            ->selectRaw('coalesce(sum(input_tokens), 0) as input, coalesce(sum(output_tokens), 0) as output')->first();
+        return $this->costOf((int) $row->input, (int) $row->output, (int) $row->cache_write, (int) $row->cache_read);
+    }
 
-        return $this->costOf((int) $tokens->input, (int) $tokens->output);
+    public function since(Carbon $from, ?string $agent = null): float
+    {
+        $row = AgentRun::where('created_at', '>=', $from)->when($agent !== null, fn ($query) => $query->where('agent', $agent))
+            ->selectRaw(self::SUMS)->first();
+
+        return $this->costOfRow($row);
+    }
+
+    public function agentThisMonth(string $agent): float
+    {
+        return $this->since(now()->startOfMonth(), $agent);
     }
 
     public function today(): float
@@ -60,8 +75,8 @@ class Spending
     public function byAgentThisMonth(): array
     {
         return AgentRun::where('created_at', '>=', now()->startOfMonth())
-            ->selectRaw('agent, sum(input_tokens) as input, sum(output_tokens) as output')->groupBy('agent')->get()
-            ->mapWithKeys(fn ($row): array => [$row->agent => $this->costOf((int) $row->input, (int) $row->output)])
+            ->selectRaw('agent, '.self::SUMS)->groupBy('agent')->get()
+            ->mapWithKeys(fn ($row): array => [$row->agent => $this->costOfRow($row)])
             ->sortDesc()->all();
     }
 
@@ -69,14 +84,14 @@ class Spending
     public function averageMeeting(): ?float
     {
         $meetings = AgentRun::where('meeting', true)->whereNotNull('finished_at')
-            ->selectRaw('message_id, sum(input_tokens) as input, sum(output_tokens) as output')->groupBy('message_id')
+            ->selectRaw('message_id, '.self::SUMS)->groupBy('message_id')
             ->orderByDesc('message_id')->limit(20)->get();
 
         if ($meetings->isEmpty()) {
             return null;
         }
 
-        return $meetings->avg(fn ($row): float => $this->costOf((int) $row->input, (int) $row->output));
+        return $meetings->avg(fn ($row): float => $this->costOfRow($row));
     }
 
     public function budget(): ?float

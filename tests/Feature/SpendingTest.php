@@ -43,6 +43,16 @@ class SpendingTest extends TestCase
         $this->assertSame(['acc', 'sec'], array_keys($spending->byAgentThisMonth()));
     }
 
+    public function test_cache_reads_and_writes_are_priced_too(): void
+    {
+        // Opus 5.5: writing to the cache $5 per million, reading $0.20 per million.
+        AgentRun::create(['agent' => 'acc', 'channel' => 'everyone', 'status' => AgentRun::DONE, 'cache_write_tokens' => 1_000_000, 'cache_read_tokens' => 10_000_000]);
+
+        $this->assertEqualsWithDelta(7.0, app(Spending::class)->thisMonth(), 0.0001);
+        $this->assertEqualsWithDelta(7.0, app(Spending::class)->agentThisMonth('acc'), 0.0001);
+        $this->assertEqualsWithDelta(0.0, app(Spending::class)->agentThisMonth('sec'), 0.0001);
+    }
+
     public function test_each_agent_spends_by_the_rules_for_its_rank(): void
     {
         Setting::write(Spending::BUDGET, '10');

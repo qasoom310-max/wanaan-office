@@ -45,6 +45,12 @@ class FakeAgentModel implements AgentModel
         return $this->configured;
     }
 
+    /** @var list<array<string, mixed>> The messages exactly as sent on the last call. */
+    public array $rawMessages = [];
+
+    /** @var list<string> The shared system part of every call. */
+    public array $systems = [];
+
     /** @var array<string, mixed> Limits given on the last call. */
     public array $lastLimits = [];
 
@@ -52,9 +58,24 @@ class FakeAgentModel implements AgentModel
     {
         $this->lastLimits = $limits;
         $this->calls++;
-        $this->lastInstructions = $instructions;
-        $this->lastMessages = $messages;
-        $this->conversations[] = $messages;
+        // Flatten for easy checking: the shared rules plus the agent's own system part,
+        // and the conversation as plain text turns.
+        $flat = [];
+        $own = '';
+        foreach ($messages as $message) {
+            $text = is_string($message['content']) ? $message['content'] : implode("\n", array_column($message['content'], 'text'));
+            if ($message['role'] === 'system') {
+                $own .= "\n".$text;
+
+                continue;
+            }
+            $flat[] = ['role' => $message['role'], 'content' => $text];
+        }
+        $this->lastInstructions = $instructions.$own;
+        $this->lastMessages = $flat;
+        $this->conversations[] = $flat;
+        $this->rawMessages = $messages;
+        $this->systems[] = $instructions;
         $this->offeredTools = array_map(fn (AgentTool $tool): string => $tool->name, $tools);
 
         foreach ($this->useTools as [$name, $input]) {
@@ -72,7 +93,7 @@ class FakeAgentModel implements AgentModel
             throw new AgentProblem($this->problem);
         }
 
-        $text = $this->answerWith !== null ? ($this->answerWith)($instructions, $messages) : $this->answer;
+        $text = $this->answerWith !== null ? ($this->answerWith)($this->lastInstructions, $messages) : $this->answer;
 
         return ['text' => $text, 'input_tokens' => 120, 'output_tokens' => 8];
     }
