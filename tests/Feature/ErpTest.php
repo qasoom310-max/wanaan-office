@@ -58,25 +58,25 @@ class ErpTest extends TestCase
         $team = app(Team::class);
 
         $this->assertFalse($team->hasData('acc'));
-        $this->assertSame([], $team->toolsFor('acc'));
+        $this->assertSame(['office_ask_owner'], array_map(fn ($tool) => $tool->name, $team->toolsFor('acc')));
     }
 
     public function test_once_connected_each_agent_reads_only_its_own_section(): void
     {
         $this->connect();
         $team = app(Team::class);
-        $names = fn (string $agent): array => array_map(fn ($tool) => $tool->name, $team->toolsFor($agent));
+        $erp = fn (string $agent): array => array_values(array_filter(array_map(fn ($tool) => $tool->name, $team->toolsFor($agent)), fn (string $name): bool => str_starts_with($name, 'erp_')));
 
-        $this->assertTrue($team->hasData('acc'));
-        $this->assertTrue($team->hasData('limo'));
-        $this->assertTrue($team->hasData('rent'));
-        $this->assertFalse($team->hasData('fin'));
-        $this->assertSame([], $team->toolsFor('sec'));
+        foreach (['acc', 'fin', 'limo', 'rent'] as $agent) {
+            $this->assertContains('erp', $team->connectedSources($agent));
+        }
+        $this->assertSame([], $erp('sec'));
+        $this->assertSame([], $erp('mkt'));
 
-        $this->assertContains('erp_journal_entries', $names('acc'));
-        $this->assertNotContains('erp_limousine_trips', $names('acc'));
-        $this->assertSame(['erp_companies', 'erp_staff', 'erp_activity', 'erp_limousine_trips', 'erp_limousine_invoices', 'erp_limousine_expenses'], $names('limo'));
-        $this->assertSame(['erp_companies', 'erp_staff', 'erp_activity', 'erp_rental_orders', 'erp_rental_fleet'], $names('rent'));
+        $this->assertSame(['erp_companies', 'erp_staff', 'erp_activity', 'erp_journal_entries'], $erp('acc'));
+        $this->assertSame(['erp_companies', 'erp_staff', 'erp_activity', 'erp_journal_entries', 'erp_money_in', 'erp_money_out'], $erp('fin'));
+        $this->assertSame(['erp_companies', 'erp_staff', 'erp_activity', 'erp_limousine_trips', 'erp_limousine_invoices', 'erp_limousine_expenses'], $erp('limo'));
+        $this->assertSame(['erp_companies', 'erp_staff', 'erp_activity', 'erp_rental_orders', 'erp_rental_fleet'], $erp('rent'));
     }
 
     public function test_the_accountant_reads_every_page_of_entries_and_each_lookup_is_a_step_on_its_desk(): void
@@ -92,7 +92,7 @@ class ErpTest extends TestCase
         $entries = json_decode($this->model->toolResults['erp_journal_entries'], true);
         $this->assertSame(['DEMO/0001', 'DEMO/0002'], array_column($entries['rows'], 'number'));
         $this->assertTrue($entries['complete']);
-        $this->assertStringContainsString('erp_ tools (read-only)', $this->model->lastInstructions);
+        $this->assertStringContainsString('erp_ tools (read-only; your sections: accounting)', $this->model->lastInstructions);
         $this->assertSame(AgentRun::DONE, AgentRun::sole()->status);
         $this->assertSame('acc', Message::whereNotNull('agent')->sole()->agent);
 

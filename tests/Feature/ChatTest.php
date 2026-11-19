@@ -153,7 +153,7 @@ class ChatTest extends TestCase
 
         $this->assertStringContainsString('Deposits are refunded within 7 days.', $this->model->lastInstructions);
         $this->assertStringContainsString('Only for the planner. (for Gulf Planner)', $this->model->lastInstructions);
-        $this->assertStringContainsString('not connected to any company data yet', $this->model->lastInstructions);
+        $this->assertStringContainsString('cannot see Wanaan\'s company records', $this->model->lastInstructions);
         $this->assertSame('user', $this->model->lastMessages[0]['role']);
         $this->assertStringContainsString('When do deposits go back?', end($this->model->lastMessages)['content']);
     }

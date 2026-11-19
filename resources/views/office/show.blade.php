@@ -60,11 +60,12 @@
                         <span class="name">{{ $team->displayName($deskAgent) }}</span>
                         <span class="role">@if($team->nameOf($deskAgent))<b>{{ $profile['title'] }}</b> · @endif{{ $profile['role'] }}</span>
                         <span class="tags">
-                            @if ($team->hasData($deskAgent))
-                                <span class="tag data">Has data</span>
-                            @else
+                            @php $sources = $team->connectedSources($deskAgent); @endphp
+                            @forelse ($sources as $source)
+                                <span class="tag data" title="{{ ['erp' => 'Reads the ERP: '.implode(', ', $profile['erp'] ?? []), 'seo' => 'Reads the SEO system', 'web' => 'Searches the web', 'office' => 'Reads the office: questions, IT board, spending, team chat'][$source] ?? $source }}">{{ ['erp' => 'ERP', 'seo' => 'SEO', 'web' => 'Web', 'office' => 'Office'][$source] ?? $source }}</span>
+                            @empty
                                 <span class="tag">Talk only</span>
-                            @endif
+                            @endforelse
                             <span class="tag">Phase {{ $profile['phase'] }}</span>
                             <span class="tag" title="AI spending this month">${{ number_format($deskSpend[$deskAgent] ?? 0, 2) }}</span>
                         </span>

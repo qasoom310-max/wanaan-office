@@ -110,6 +110,22 @@ class ErpTools
                     fn (array $in): string => $this->json($this->pages('limousine/expenses', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null])),
                 ),
             ],
+            'money' => [
+                new AgentTool(
+                    'erp_money_in',
+                    'Money that came in to one company over a period (at most 93 days): limousine and rent-a-car receipts, with customer, invoice, method and whether each was confirmed. from and to are required.',
+                    ['type' => 'object', 'properties' => ['company_id' => $company, ...$day], 'required' => ['company_id', 'from', 'to']],
+                    fn (array $in): string => 'Opening the ERP: money in for '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->erp->get('money/in', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null])),
+                ),
+                new AgentTool(
+                    'erp_money_out',
+                    'Money that went out of one company over a period (at most 93 days): company expenses, purchases, limousine expenses (and which have no bill), petty-cash advances and payroll as a monthly total. from and to are required.',
+                    ['type' => 'object', 'properties' => ['company_id' => $company, ...$day], 'required' => ['company_id', 'from', 'to']],
+                    fn (array $in): string => 'Opening the ERP: money out for '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->erp->get('money/out', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null])),
+                ),
+            ],
             'rental' => [
                 new AgentTool(
                     'erp_rental_orders',

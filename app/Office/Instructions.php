@@ -5,6 +5,7 @@ namespace App\Office;
 use App\Jobs\RunAgent;
 use App\Models\Fact;
 use App\Models\Message;
+use App\Models\Question;
 
 /**
  * What an agent is told before it answers, laid out for prompt caching:
@@ -90,10 +91,25 @@ class Instructions
             ($this->spending->isManager($agent) ? 'You are a manager.' : 'You are an employee.').' Answer now, as '.$this->team->label($agent).', to the latest message.',
         ];
 
-        if (in_array('erp', $this->team->connectedSources($agent), true)) {
-            $lines[] = 'You can read the Wanaan ERP through your erp_ tools (read-only). Look before you speak: base every figure on what the tools return, name the company and the period, and say when a list was cut short. Start with erp_companies.';
-        } else {
-            $lines[] = 'You are not connected to any company data yet. You can talk, plan and give general advice, but say plainly that you cannot see the real records, and never present a figure as Wanaan\'s own.';
+        $sources = $this->team->connectedSources($agent);
+        if (in_array('erp', $sources, true)) {
+            $lines[] = 'You can read the Wanaan ERP through your erp_ tools (read-only; your sections: '.implode(', ', $profile['erp'] ?? []).'). Look before you speak: base every figure on what the tools return, name the company and the period, and say when a list was cut short. Start with erp_companies.';
+        }
+        if (in_array('seo', $sources, true)) {
+            $lines[] = 'You can read the SEO system through your seo_ tools (read-only). It decides which keywords the websites chase and what gets written; marketing follows it and never invents its own SEO decisions. Start with seo_projects.';
+        }
+        if (in_array('web', $sources, true)) {
+            $lines[] = 'You can search the web for trends, competitors and facts about Bahrain and the Gulf. Name your sources, and never present what you found on the web as Wanaan\'s own data.';
+        }
+        if (in_array('office', $sources, true)) {
+            $lines[] = 'You can read the office through your office_ tools: open questions, the IT board, spending and what the team did (never anyone\'s private chat).';
+        }
+        if (! in_array('erp', $sources, true) && ! in_array('seo', $sources, true)) {
+            $lines[] = 'You cannot see Wanaan\'s company records (the ERP). Say so plainly when it matters, and never present a figure as Wanaan\'s own.';
+        }
+        $lines[] = 'If your work depends on something only the owner can answer, put it on the Questions page with office_ask_owner (at most '.Question::OPEN_PER_AGENT.' open).';
+        if (($profile['manager'] ?? false) || $agent === 'it') {
+            $lines[] = 'When the data or the system is not good enough for your work, push IT for the improvement with office_request_it. It waits on the IT board until the owner approves it.';
         }
 
         if ($meeting) {

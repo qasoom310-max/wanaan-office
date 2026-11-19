@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Setting;
 use App\Office\AgentModel;
 use App\Office\Erp\ErpClient;
+use App\Office\Seo\SeoClient;
 use App\Office\Spending;
 use App\Office\Team;
 use Illuminate\Http\RedirectResponse;
@@ -13,7 +14,7 @@ use Illuminate\View\View;
 
 class SettingsController extends Controller
 {
-    public function edit(AgentModel $model, ErpClient $erp, Spending $spending, Team $team): View
+    public function edit(AgentModel $model, ErpClient $erp, SeoClient $seo, Spending $spending, Team $team): View
     {
         $key = Setting::read(Setting::ANTHROPIC_API_KEY);
 
@@ -23,6 +24,8 @@ class SettingsController extends Controller
             'erpConnected' => $erp->isConnected(),
             'erpUrl' => Setting::read(ErpClient::URL),
             'erpWorkspaces' => implode(', ', $erp->workspaceIds()),
+            'seoConnected' => $seo->isConnected(),
+            'seoUrl' => Setting::read(SeoClient::URL),
             'connected' => $model->isConfigured(),
             // Only the last four characters are ever shown back.
             'keyEnding' => $key !== null ? substr($key, -4) : null,

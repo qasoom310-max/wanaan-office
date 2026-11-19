@@ -44,6 +44,11 @@ class ClaudeAgentModel implements AgentModel
             $byName[$tool->name] = $tool;
         }
         $definitions = array_map(fn (AgentTool $tool): array => $tool->definition(), $tools);
+        if ($limits['web_search'] ?? false) {
+            // Searched on Anthropic's side; results come back inside the answer.
+            $definitions[] = ['type' => 'web_search_20260209', 'name' => 'web_search', 'maxUses' => (int) config('office.web_searches_per_answer')];
+        }
+        $searches = 0;
 
         $inputTokens = 0;
         $outputTokens = 0;
@@ -57,6 +62,20 @@ class ClaudeAgentModel implements AgentModel
             $outputTokens += (int) $response->usage->outputTokens;
             $cacheWrite += (int) ($response->usage->cacheCreationInputTokens ?? 0);
             $cacheRead += (int) ($response->usage->cacheReadInputTokens ?? 0);
+            $searches += (int) ($response->usage->serverToolUse?->webSearchRequests ?? 0);
+
+            foreach ($response->content as $block) {
+                if ($block->type === 'server_tool_use' && $block->name === 'web_search') {
+                    $onStep('Searching the web: '.mb_substr((string) (((array) $block->input)['query'] ?? ''), 0, 80));
+                }
+            }
+
+            // A long web search pauses the turn; send it back to carry on.
+            if ($response->stopReason === 'pause_turn') {
+                $messages[] = ['role' => 'assistant', 'content' => $response->content];
+
+                continue;
+            }
 
             if ($response->stopReason === 'refusal') {
                 throw new AgentProblem('the AI declined this request');
@@ -79,6 +98,7 @@ class ClaudeAgentModel implements AgentModel
                     'output_tokens' => $outputTokens,
                     'cache_write_tokens' => $cacheWrite,
                     'cache_read_tokens' => $cacheRead,
+                    'web_searches' => $searches,
                 ];
             }
 

@@ -14,7 +14,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $heartbeat_at
  * @property Carbon|null $finished_at
  */
-#[Fillable(['agent', 'channel', 'owner_id', 'message_id', 'status', 'step', 'step_number', 'step_total', 'error', 'claimed_at', 'heartbeat_at', 'finished_at', 'input_tokens', 'output_tokens', 'cache_write_tokens', 'cache_read_tokens', 'meeting'])]
+#[Fillable(['agent', 'channel', 'owner_id', 'message_id', 'status', 'step', 'step_number', 'step_total', 'error', 'claimed_at', 'heartbeat_at', 'finished_at', 'input_tokens', 'output_tokens', 'cache_write_tokens', 'cache_read_tokens', 'web_searches', 'meeting'])]
 class AgentRun extends Model
 {
     /** In a team meeting, queued behind the agents before it. */

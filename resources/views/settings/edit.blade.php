@@ -41,4 +41,13 @@
         @endif
         <p class="muted" style="margin:0">The connection is set from the server's command line (php artisan office:connect-erp), so the ERP key never passes through a web page.</p>
     </div>
+
+    <div class="panel" style="max-width:560px">
+        <b>SEO system</b>
+        @if ($seoConnected)
+            <p class="muted" style="margin:0">Connected to {{ $seoUrl }}. Read-only. The marketing team follows its keywords and writing calendar.</p>
+        @else
+            <p class="muted" style="margin:0">Not connected. The marketing team stays "Talk only" until it is (php artisan office:connect-seo).</p>
+        @endif
+    </div>
 @endsection

@@ -27,21 +27,22 @@ class Spending
     /** No more spending for this agent until the owner raises the budget. */
     public const STOPPED = 'stopped';
 
-    private const SUMS = 'coalesce(sum(input_tokens), 0) as input, coalesce(sum(output_tokens), 0) as output, coalesce(sum(cache_write_tokens), 0) as cache_write, coalesce(sum(cache_read_tokens), 0) as cache_read';
+    private const SUMS = 'coalesce(sum(input_tokens), 0) as input, coalesce(sum(output_tokens), 0) as output, coalesce(sum(cache_write_tokens), 0) as cache_write, coalesce(sum(cache_read_tokens), 0) as cache_read, coalesce(sum(web_searches), 0) as searches';
 
-    public function costOf(int $inputTokens, int $outputTokens, int $cacheWriteTokens = 0, int $cacheReadTokens = 0): float
+    public function costOf(int $inputTokens, int $outputTokens, int $cacheWriteTokens = 0, int $cacheReadTokens = 0, int $webSearches = 0): float
     {
         $price = config('office.prices')[config('office.model')] ?? [];
 
         return ($inputTokens * ($price['input'] ?? 0)
             + $outputTokens * ($price['output'] ?? 0)
             + $cacheWriteTokens * ($price['cache_write'] ?? 0)
-            + $cacheReadTokens * ($price['cache_read'] ?? 0)) / 1_000_000;
+            + $cacheReadTokens * ($price['cache_read'] ?? 0)) / 1_000_000
+            + $webSearches * (float) config('office.web_search_price');
     }
 
     private function costOfRow(object $row): float
     {
-        return $this->costOf((int) $row->input, (int) $row->output, (int) $row->cache_write, (int) $row->cache_read);
+        return $this->costOf((int) $row->input, (int) $row->output, (int) $row->cache_write, (int) $row->cache_read, (int) $row->searches);
     }
 
     public function since(Carbon $from, ?string $agent = null): float

@@ -2,8 +2,10 @@
 
 /*
 | The team. Each agent is the same AI with its own job, its own rules and its own
-| data. `data` lists the sources an agent may read ("erp": the Wanaan ERP, read-only,
-| limited to the sections in `erp`: accounting, limousine, rental);
+| data. `data` lists the sources an agent may read: "erp" (the Wanaan ERP, read-only,
+| limited to the sections in `erp`: accounting, money, limousine, rental), "seo" (the
+| SEO system, read-only), "web" (web search) and "office" (the office's own questions,
+| IT board, spending and team chat);
 | a source counts only once it is connected in Settings. An agent with none connected
 | is "Talk only" and must say so instead of inventing numbers. `phase` is when it gets
 | its real data and scheduled work.
@@ -18,6 +20,12 @@ return [
     'prices' => [
         'claude-opus-5-5' => ['input' => 4.00, 'output' => 20.00, 'cache_write' => 5.00, 'cache_read' => 0.20],
     ],
+
+    // US dollars per web search ($10 per 1,000), on top of the tokens it reads.
+    'web_search_price' => 0.01,
+
+    // Web searches one answer may make.
+    'web_searches_per_answer' => 5,
 
     // From this share of the monthly budget, every agent speaks less.
     'budget_warning' => 0.8,
@@ -47,7 +55,7 @@ return [
             'team' => 'front',
             'role' => 'Takes your instructions, routes them, daily brief',
             'phase' => 1,
-            'data' => [],
+            'data' => ['office'],
             'brief' => 'You are the owner\'s secretary. You receive instructions, decide which agent or person should handle them, keep track of what is open, and write a short daily brief: what is done, what is late, what needs the owner\'s decision. In the private chat, what the owner tells you stays private.',
         ],
         'acc' => [
@@ -65,7 +73,8 @@ return [
             'team' => 'accounts',
             'role' => 'Money in and out. Holds payments for your approval',
             'phase' => 2,
-            'data' => [],
+            'data' => ['erp'],
+            'erp' => ['accounting', 'money'],
             'brief' => 'You are the accounts manager. You follow money coming in and going out, check every outgoing payment, and flag or hold doubtful ones. You never approve a payment: the owner does.',
         ],
         'limo' => [
@@ -94,7 +103,7 @@ return [
             'team' => 'it',
             'role' => 'Writes requirements for staff and agents',
             'phase' => 4,
-            'data' => [],
+            'data' => ['office'],
             'brief' => 'You are the IT manager. You turn requests from the team into clear requirements, judge their size, and keep the IT board honest. Nothing is built before the owner approves it.',
         ],
         'mkt' => [
@@ -103,7 +112,7 @@ return [
             'team' => 'marketing',
             'role' => 'Decides what gets made and published',
             'phase' => 3,
-            'data' => [],
+            'data' => ['seo'],
             'brief' => 'You lead marketing. You decide what gets made and published, following the keywords and calendar the SEO system already chose. You judge results by enquiries and customers, not likes.',
         ],
         'res' => [
@@ -111,7 +120,7 @@ return [
             'team' => 'marketing',
             'role' => 'Finds trends and formats that work',
             'phase' => 3,
-            'data' => [],
+            'data' => ['seo', 'web'],
             'brief' => 'You research trends and formats that work for car rental and limousine services in Bahrain and the Gulf. You borrow formats, never other people\'s content.',
         ],
         'txt' => [
@@ -119,7 +128,7 @@ return [
             'team' => 'marketing',
             'role' => 'Captions, posts, scripts. LinkedIn posts for company clients',
             'phase' => 3,
-            'data' => [],
+            'data' => ['seo'],
             'brief' => 'You write captions, posts and video scripts, and LinkedIn posts aimed at corporate clients, in English and Arabic.',
         ],
         'pic' => [
@@ -127,7 +136,7 @@ return [
             'team' => 'marketing',
             'role' => 'Designs in Canva',
             'phase' => 3,
-            'data' => [],
+            'data' => ['seo'],
             'brief' => 'You plan and describe pictures for posts and ads, sized for each platform.',
         ],
         'vid' => [
@@ -135,7 +144,7 @@ return [
             'team' => 'marketing',
             'role' => 'Short videos',
             'phase' => 3,
-            'data' => [],
+            'data' => ['seo'],
             'brief' => 'You plan short videos: hook, shots, captions and length for each platform.',
         ],
         'pln' => [
@@ -144,7 +153,7 @@ return [
             'team' => 'planning',
             'role' => 'How Wanaan grows across the Gulf',
             'phase' => 4,
-            'data' => [],
+            'data' => ['web'],
             'brief' => 'You plan how Wanaan grows across the Gulf: which country next, in what order, and what it takes. You say what you do not know instead of guessing.',
         ],
     ],

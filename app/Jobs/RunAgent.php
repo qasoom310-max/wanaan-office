@@ -90,6 +90,9 @@ class RunAgent implements ShouldQueue
                 Spending::RESERVE => ['effort' => 'low', 'max_rounds' => 3],
                 default => [],
             };
+            if ($team->searchesWeb($run->agent)) {
+                $limits['web_search'] = true;
+            }
             $reply = $model->reply($system, $conversation, $team->toolsFor($run->agent), function (string $label) use ($run, &$step, &$total): void {
                 // Each tool the agent uses is a real step on its desk.
                 $step = min($step + 1, 250);
@@ -102,6 +105,7 @@ class RunAgent implements ShouldQueue
                 'output_tokens' => $reply['output_tokens'],
                 'cache_write_tokens' => $reply['cache_write_tokens'] ?? 0,
                 'cache_read_tokens' => $reply['cache_read_tokens'] ?? 0,
+                'web_searches' => $reply['web_searches'] ?? 0,
             ]);
 
             // In a meeting, an agent with nothing to add only marks the message read.

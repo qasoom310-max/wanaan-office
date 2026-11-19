@@ -4,8 +4,11 @@ namespace App\Office;
 
 use App\Models\AgentName;
 use App\Office\Erp\ErpClient;
+use App\Office\Seo\SeoClient;
 use App\Office\Tools\AgentTool;
 use App\Office\Tools\ErpTools;
+use App\Office\Tools\OfficeTools;
+use App\Office\Tools\SeoTools;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -79,20 +82,47 @@ class Team
     {
         return array_values(array_filter($this->get($agent)['data'], fn (string $source): bool => match ($source) {
             'erp' => app(ErpClient::class)->isConnected(),
+            'seo' => app(SeoClient::class)->isConnected(),
+            'web', 'office' => true,
             default => false,
         }));
     }
 
     /**
-     * What the agent may use while answering.
+     * What the agent may use while answering: its data sources, plus asking the owner
+     * (everyone) and asking IT (managers and IT).
      *
      * @return list<AgentTool>
      */
     public function toolsFor(string $agent): array
     {
-        return in_array('erp', $this->connectedSources($agent), true)
-            ? app(ErpTools::class)->forSections($this->get($agent)['erp'] ?? [])
-            : [];
+        $sources = $this->connectedSources($agent);
+        $office = app(OfficeTools::class);
+        $tools = [];
+
+        if (in_array('erp', $sources, true)) {
+            array_push($tools, ...app(ErpTools::class)->forSections($this->get($agent)['erp'] ?? []));
+        }
+        if (in_array('seo', $sources, true)) {
+            array_push($tools, ...app(SeoTools::class)->all());
+        }
+        if (in_array('office', $sources, true)) {
+            array_push($tools, ...$office->reading());
+        }
+
+        // Every agent may ask the owner; managers and IT may also ask IT for improvements.
+        $tools[] = $office->askOwner($agent);
+        if (($this->get($agent)['manager'] ?? false) || $agent === 'it') {
+            $tools[] = $office->requestIt($agent);
+        }
+
+        return $tools;
+    }
+
+    /** True when the agent may search the web while answering. */
+    public function searchesWeb(string $agent): bool
+    {
+        return in_array('web', $this->connectedSources($agent), true);
     }
 
     /**
