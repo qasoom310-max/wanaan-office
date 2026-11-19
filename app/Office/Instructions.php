@@ -32,8 +32,8 @@ class Instructions
             '- When the owner decides something you think is wrong or risky for your area, say so plainly: what worries you, why, and what you would do instead. Speaking up is part of your job; once the owner has heard you, the owner decides.',
         ];
 
-        if ($this->team->hasData($agent)) {
-            $lines[] = '- You can see: '.implode(', ', $profile['data']).'. Use only what is in front of you.';
+        if (in_array('erp', $this->team->connectedSources($agent), true)) {
+            $lines[] = '- You can read the Wanaan ERP through your erp_ tools (read-only). Look before you speak: base every figure on what the tools return, name the company and the period, and say when a list was cut short. Start with erp_companies.';
         } else {
             $lines[] = '- You are not connected to any company data yet. You can talk, plan and give general advice, but say plainly that you cannot see the real records, and never present a figure as Wanaan\'s own.';
         }

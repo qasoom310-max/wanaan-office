@@ -3,6 +3,9 @@
 namespace App\Office;
 
 use App\Models\AgentName;
+use App\Office\Erp\ErpClient;
+use App\Office\Tools\AgentTool;
+use App\Office\Tools\ErpTools;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -61,10 +64,33 @@ class Team
         return $name !== null ? "{$name} · {$this->title($agent)}" : $this->title($agent);
     }
 
-    /** True when the agent can read real data; false means it may only talk. */
+    /** True when the agent can read real data right now; false means it may only talk. */
     public function hasData(string $agent): bool
     {
-        return $this->get($agent)['data'] !== [];
+        return $this->connectedSources($agent) !== [];
+    }
+
+    /**
+     * The agent's data sources that are connected right now.
+     *
+     * @return list<string>
+     */
+    public function connectedSources(string $agent): array
+    {
+        return array_values(array_filter($this->get($agent)['data'], fn (string $source): bool => match ($source) {
+            'erp' => app(ErpClient::class)->isConnected(),
+            default => false,
+        }));
+    }
+
+    /**
+     * What the agent may use while answering.
+     *
+     * @return list<AgentTool>
+     */
+    public function toolsFor(string $agent): array
+    {
+        return in_array('erp', $this->connectedSources($agent), true) ? app(ErpTools::class)->all() : [];
     }
 
     /**

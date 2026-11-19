@@ -4,17 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use App\Office\AgentModel;
+use App\Office\Erp\ErpClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class SettingsController extends Controller
 {
-    public function edit(AgentModel $model): View
+    public function edit(AgentModel $model, ErpClient $erp): View
     {
         $key = Setting::read(Setting::ANTHROPIC_API_KEY);
 
         return view('settings.edit', [
+            'erpConnected' => $erp->isConnected(),
+            'erpUrl' => Setting::read(ErpClient::URL),
+            'erpWorkspaces' => implode(', ', $erp->workspaceIds()),
             'connected' => $model->isConfigured(),
             // Only the last four characters are ever shown back.
             'keyEnding' => $key !== null ? substr($key, -4) : null,

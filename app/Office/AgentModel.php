@@ -2,6 +2,9 @@
 
 namespace App\Office;
 
+use App\Office\Tools\AgentTool;
+use Closure;
+
 /**
  * Whatever writes an agent's answer. The real one asks Claude; tests use a fake.
  */
@@ -11,9 +14,11 @@ interface AgentModel
 
     /**
      * @param  list<array{role: 'user'|'assistant', content: string}>  $messages
+     * @param  list<AgentTool>  $tools  what the agent may use while answering
+     * @param  Closure(string): void  $onStep  told each step as the agent takes it
      * @return array{text: string, input_tokens: int, output_tokens: int}
      *
      * @throws AgentProblem when no answer could be written
      */
-    public function reply(string $instructions, array $messages): array;
+    public function reply(string $instructions, array $messages, array $tools, Closure $onStep): array;
 }

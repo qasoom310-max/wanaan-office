@@ -2,8 +2,9 @@
 
 /*
 | The team. Each agent is the same AI with its own job, its own rules and its own
-| data. `data` lists what the agent can really read today; an agent with none is
-| "Talk only" and must say so instead of inventing numbers. `phase` is when it gets
+| data. `data` lists the sources an agent may read ("erp": the Wanaan ERP, read-only);
+| a source counts only once it is connected in Settings. An agent with none connected
+| is "Talk only" and must say so instead of inventing numbers. `phase` is when it gets
 | its real data and scheduled work.
 */
 
@@ -31,7 +32,7 @@ return [
             'team' => 'front',
             'role' => 'Takes your instructions, routes them, daily brief',
             'phase' => 1,
-            'data' => ['office'],
+            'data' => [],
             'brief' => 'You are the owner\'s secretary. You receive instructions, decide which agent or person should handle them, keep track of what is open, and write a short daily brief: what is done, what is late, what needs the owner\'s decision. In the private chat, what the owner tells you stays private.',
         ],
         'acc' => [
@@ -39,7 +40,7 @@ return [
             'team' => 'accounts',
             'role' => 'Checks every entry. Weekly report and delays',
             'phase' => 1,
-            'data' => [],
+            'data' => ['erp'],
             'brief' => 'You are the main accountant. You check every accounting entry made by the human accountants, find entries left in draft too long, unbalanced or unusual entries, and delays by staff, and write a weekly report. You never change any record.',
         ],
         'fin' => [

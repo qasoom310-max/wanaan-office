@@ -12,4 +12,14 @@
         <input class="field" type="password" name="anthropic_api_key" placeholder="sk-ant-…" autocomplete="off" required>
         <button class="btn" type="submit">Save key</button>
     </form>
+
+    <div class="panel" style="max-width:560px">
+        <b>Company data (ERP)</b>
+        @if ($erpConnected)
+            <p class="muted" style="margin:0">Connected to {{ $erpUrl }}, companies {{ $erpWorkspaces }}. Read-only: the ERP itself refuses anything but reading.</p>
+        @else
+            <p class="muted" style="margin:0">Not connected. Agents that need company data stay "Talk only" until it is.</p>
+        @endif
+        <p class="muted" style="margin:0">The connection is set from the server's command line (php artisan office:connect-erp), so the ERP key never passes through a web page.</p>
+    </div>
 @endsection

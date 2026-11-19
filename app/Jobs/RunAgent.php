@@ -62,12 +62,14 @@ class RunAgent implements ShouldQueue
                 return;
             }
 
-            if ($hasData) {
-                $run->moveTo('Looking at the data I can see', 3, $total);
-            }
-
-            $run->moveTo('Writing the answer', $total, $total);
-            $reply = $model->reply($system, $conversation);
+            $step = 3;
+            $run->moveTo('Thinking', 3, $total);
+            $reply = $model->reply($system, $conversation, $team->toolsFor($run->agent), function (string $label) use ($run, &$step, &$total): void {
+                // Each tool the agent uses is a real step on its desk.
+                $step = min($step + 1, 250);
+                $total = max($total, $step + 1);
+                $run->moveTo($label, $step, $total);
+            });
 
             $run->update(['input_tokens' => $reply['input_tokens'], 'output_tokens' => $reply['output_tokens']]);
 
