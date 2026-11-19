@@ -41,5 +41,6 @@ Route::middleware(['auth', EnsurePasswordChanged::class])->group(function () {
         Route::get('settings', [SettingsController::class, 'edit'])->name('settings');
         Route::put('settings', [SettingsController::class, 'update'])->name('settings.update');
         Route::put('settings/budget', [SettingsController::class, 'budget'])->name('settings.budget');
+        Route::put('settings/erp', [SettingsController::class, 'erp'])->name('settings.erp');
     });
 });

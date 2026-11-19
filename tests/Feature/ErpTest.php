@@ -124,6 +124,27 @@ class ErpTest extends TestCase
         app(ErpTools::class)->forSections(['accounting'])[1]->run->__invoke(['company_id' => 1]);
     }
 
+    public function test_the_owner_connects_the_erp_from_settings_and_the_erp_says_which_companies(): void
+    {
+        $owner = User::factory()->owner()->create();
+        Http::fake([
+            'erp.example.test/api/office/v1/workspaces' => Http::response(['data' => [['id' => 1, 'name' => 'Main', 'main' => true], ['id' => 4, 'name' => 'Kaleem', 'main' => false]]]),
+            'wrong.example.test/*' => Http::response(['error' => 'Missing, unknown or revoked office key.'], 401),
+        ]);
+
+        $this->actingAs($owner)->put(route('settings.erp'), ['erp_url' => 'https://erp.example.test', 'erp_key' => 'not-a-key'])->assertSessionHasErrors('erp_key');
+        $this->actingAs($owner)->put(route('settings.erp'), ['erp_url' => 'https://wrong.example.test', 'erp_key' => self::KEY])->assertSessionHasErrors('erp_key');
+        $this->assertFalse(app(ErpClient::class)->isConnected());
+
+        $this->actingAs($owner)->put(route('settings.erp'), ['erp_url' => 'https://erp.example.test/', 'erp_key' => self::KEY])
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', 'Connected to the ERP: Main, Kaleem.');
+
+        $this->assertSame([1, 4], app(ErpClient::class)->workspaceIds());
+        $this->assertSame('https://erp.example.test', Setting::read(ErpClient::URL));
+        $this->actingAs(User::factory()->create())->put(route('settings.erp'), ['erp_url' => 'https://erp.example.test', 'erp_key' => self::KEY])->assertForbidden();
+    }
+
     public function test_the_connect_command_saves_the_connection_and_checks_each_company(): void
     {
         $this->fakeErp();

@@ -32,15 +32,19 @@
         <button class="btn" type="submit">Save key</button>
     </form>
 
-    <div class="panel" style="max-width:560px">
+    <form class="panel" id="erp" method="POST" action="{{ route('settings.erp') }}" style="max-width:560px">
+        @csrf @method('PUT')
         <b>Company data (ERP)</b>
         @if ($erpConnected)
-            <p class="muted" style="margin:0">Connected to {{ $erpUrl }}, companies {{ $erpWorkspaces }}. Read-only: the ERP itself refuses anything but reading.</p>
+            <p class="muted" style="margin:0">Connected to <b>{{ $erpUrl }}</b>, companies {{ $erpWorkspaces }}. Read-only: the ERP itself refuses anything but reading. Connect again below to switch to another ERP or key.</p>
         @else
             <p class="muted" style="margin:0">Not connected. Agents that need company data stay "Talk only" until it is.</p>
         @endif
-        <p class="muted" style="margin:0">The connection is set from the server's command line (php artisan office:connect-erp), so the ERP key never passes through a web page.</p>
-    </div>
+        <p class="muted" style="margin:0">In the ERP, sign in as the owner, open <b>Settings → AI office</b>, press <b>Create key</b> and copy it. Paste it here.</p>
+        <input class="field" type="url" name="erp_url" value="{{ old('erp_url', $erpUrl ?: 'https://erp.wanaan-bh.com') }}" placeholder="https://erp.wanaan-bh.com" aria-label="ERP address" required>
+        <input class="field" type="password" name="erp_key" placeholder="office_…" autocomplete="off" aria-label="ERP office key" required>
+        <button class="btn" type="submit">Connect the ERP</button>
+    </form>
 
     <div class="panel" style="max-width:560px">
         <b>SEO system</b>

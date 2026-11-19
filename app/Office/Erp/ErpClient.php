@@ -70,6 +70,31 @@ class ErpClient
         return (array) $response->json();
     }
 
+    /**
+     * Ask an ERP which companies a key may read, before saving the connection.
+     *
+     * @return list<array{id: int, name: string}>
+     *
+     * @throws ErpProblem
+     */
+    public function companiesFor(string $url, string $key): array
+    {
+        try {
+            $response = Http::withToken($key)->acceptJson()->timeout(30)->get($url.'/api/office/v1/workspaces');
+        } catch (ConnectionException) {
+            throw new ErpProblem('the ERP could not be reached at that address');
+        }
+
+        if ($response->status() === 401) {
+            throw new ErpProblem('the ERP refused the key: check it was copied whole and is not switched off');
+        }
+        if (! $response->successful()) {
+            throw new ErpProblem('the ERP answered with an error ('.$response->status().'). Is this the right address?');
+        }
+
+        return array_values(array_map(fn (array $row): array => ['id' => (int) $row['id'], 'name' => (string) $row['name']], (array) $response->json('data', [])));
+    }
+
     private function url(): ?string
     {
         return Setting::read(self::URL);
