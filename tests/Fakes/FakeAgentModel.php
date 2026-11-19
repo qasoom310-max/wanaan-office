@@ -45,8 +45,12 @@ class FakeAgentModel implements AgentModel
         return $this->configured;
     }
 
-    public function reply(string $instructions, array $messages, array $tools, Closure $onStep): array
+    /** @var array<string, mixed> Limits given on the last call. */
+    public array $lastLimits = [];
+
+    public function reply(string $instructions, array $messages, array $tools, Closure $onStep, array $limits = []): array
     {
+        $this->lastLimits = $limits;
         $this->calls++;
         $this->lastInstructions = $instructions;
         $this->lastMessages = $messages;

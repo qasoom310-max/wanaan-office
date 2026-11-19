@@ -17,8 +17,12 @@ return [
         'claude-opus-5-5' => [4.00, 20.00],
     ],
 
-    // Spending shown as "nearly used" from this share of the monthly budget.
+    // From this share of the monthly budget, every agent speaks less.
     'budget_warning' => 0.8,
+
+    // Managers may go over the budget by this share, only when it is really needed.
+    // Employees stop at the budget; nobody goes past budget × (1 + reserve).
+    'manager_reserve' => 0.30,
 
     // Messages from a conversation the agent re-reads before answering.
     'history' => 40,
@@ -54,6 +58,7 @@ return [
         ],
         'fin' => [
             'title' => 'Accounts Manager',
+            'manager' => true,
             'team' => 'accounts',
             'role' => 'Money in and out. Holds payments for your approval',
             'phase' => 2,
@@ -62,6 +67,7 @@ return [
         ],
         'limo' => [
             'title' => 'Limousine Manager',
+            'manager' => true,
             'team' => 'sections',
             'role' => 'Trips, drivers, invoices. Weekly section report',
             'phase' => 2,
@@ -70,6 +76,7 @@ return [
         ],
         'rent' => [
             'title' => 'Rent A Car Manager',
+            'manager' => true,
             'team' => 'sections',
             'role' => 'Fleet, rentals, deposits. Weekly section report',
             'phase' => 2,
@@ -78,6 +85,7 @@ return [
         ],
         'it' => [
             'title' => 'IT Manager',
+            'manager' => true,
             'team' => 'it',
             'role' => 'Writes requirements for staff and agents',
             'phase' => 4,
@@ -86,6 +94,7 @@ return [
         ],
         'mkt' => [
             'title' => 'Marketing Manager',
+            'manager' => true,
             'team' => 'marketing',
             'role' => 'Decides what gets made and published',
             'phase' => 3,
@@ -126,6 +135,7 @@ return [
         ],
         'pln' => [
             'title' => 'Gulf Planner',
+            'manager' => true,
             'team' => 'planning',
             'role' => 'How Wanaan grows across the Gulf',
             'phase' => 4,

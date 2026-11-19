@@ -34,8 +34,10 @@ class ClaudeAgentModel implements AgentModel
         return filled($this->apiKey);
     }
 
-    public function reply(string $instructions, array $messages, array $tools, Closure $onStep): array
+    public function reply(string $instructions, array $messages, array $tools, Closure $onStep, array $limits = []): array
     {
+        $effort = $limits['effort'] ?? 'medium';
+        $maxRounds = min($limits['max_rounds'] ?? self::MAX_ROUNDS, self::MAX_ROUNDS);
         /** @var array<string, AgentTool> $byName */
         $byName = [];
         foreach ($tools as $tool) {
@@ -46,8 +48,9 @@ class ClaudeAgentModel implements AgentModel
         $inputTokens = 0;
         $outputTokens = 0;
 
-        for ($round = 0; $round <= self::MAX_ROUNDS; $round++) {
-            $response = $this->send($instructions, $messages, $round < self::MAX_ROUNDS ? $definitions : []);
+        for ($round = 0; $round <= $maxRounds; $round++) {
+            // On the last round no tools are offered, so the agent must answer with what it has.
+            $response = $this->send($instructions, $messages, $round < $maxRounds ? $definitions : [], $effort);
             $inputTokens += (int) $response->usage->inputTokens;
             $outputTokens += (int) $response->usage->outputTokens;
 
@@ -116,7 +119,7 @@ class ClaudeAgentModel implements AgentModel
      * @param  list<array<string, mixed>>  $messages
      * @param  list<array<string, mixed>>  $tools
      */
-    private function send(string $instructions, array $messages, array $tools): mixed
+    private function send(string $instructions, array $messages, array $tools, string $effort): mixed
     {
         try {
             return (new Client(apiKey: $this->apiKey))->beta->messages->create(
@@ -125,7 +128,7 @@ class ClaudeAgentModel implements AgentModel
                 system: $instructions,
                 messages: $messages,
                 tools: $tools,
-                outputConfig: ['effort' => 'medium'],
+                outputConfig: ['effort' => $effort],
                 // If a safety filter declines, the API retries on another model by itself.
                 fallbacks: 'default',
                 betas: ['server-side-fallback-2026-07-01'],

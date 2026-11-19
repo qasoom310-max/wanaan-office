@@ -14,7 +14,7 @@ class Instructions
 {
     public function __construct(private Team $team) {}
 
-    public function for(string $agent, string $channel, bool $meeting = false): string
+    public function for(string $agent, string $channel, bool $meeting = false, string $budget = Spending::NORMAL): string
     {
         $profile = $this->team->get($agent);
         $name = $this->team->nameOf($agent);
@@ -62,6 +62,12 @@ class Instructions
         }
         foreach ($facts as $fact) {
             $lines[] = '- '.$fact->text;
+        }
+
+        if ($budget === Spending::TIGHT) {
+            array_push($lines, '', 'This month\'s AI budget is nearly used. Speak less: answer in a few short sentences, look things up only when the answer needs it, and still finish what you were asked to do.');
+        } elseif ($budget === Spending::RESERVE) {
+            array_push($lines, '', 'This month\'s AI budget is used up. As a manager you may use a small reserve, but only for what really cannot wait: answer in two or three sentences, look up only what is essential, and tell the owner briefly that you are on the reserve.'.($meeting ? ' In this meeting, unless the message truly needs your answer now, reply with exactly '.RunAgent::READ_ONLY_REPLY.'.' : ''));
         }
 
         $lines[] = '';

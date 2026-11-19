@@ -46,11 +46,13 @@ class RunAgent implements ShouldQueue
             $run->moveTo('Reading your message', 1, $total);
 
             $run->moveTo('Reading the facts and the conversation', 2, $total);
-            $system = $instructions->for($run->agent, $run->channel, $run->meeting);
+            $system = $instructions->for($run->agent, $run->channel, $run->meeting, $spending->modeFor($run->agent));
             $conversation = $instructions->conversation($run->agent, $run->channel, $run->owner_id);
 
-            // Nothing spends past the owner's monthly budget.
-            if ($spending->isOverBudget()) {
+            // Spending rules: everyone speaks less near the budget, employees stop at it,
+            // managers may use the reserve above it only when needed, nobody goes past it.
+            $budgetMode = $spending->modeFor($run->agent);
+            if ($budgetMode === Spending::STOPPED) {
                 if ($run->meeting && $run->agent !== 'sec') {
                     $this->markRead();
                     $run->update(['status' => AgentRun::DONE, 'step' => null, 'finished_at' => now()]);
@@ -58,7 +60,9 @@ class RunAgent implements ShouldQueue
                     return;
                 }
 
-                $this->answer('This month\'s AI budget ($'.number_format((float) $spending->budget(), 2).') is used up, so I can\'t think until the owner raises it in Settings. Your message is saved.');
+                $reserve = $spending->used() < 1 + config('office.manager_reserve');
+                $this->answer('This month\'s AI budget ($'.number_format((float) $spending->budget(), 2).') is used up, so I can\'t think until the owner raises it in Settings.'
+                    .($reserve ? ' Managers may still answer what cannot wait, from their reserve.' : '').' Your message is saved.');
 
                 return;
             }
@@ -79,12 +83,17 @@ class RunAgent implements ShouldQueue
 
             $step = 3;
             $run->moveTo('Thinking', 3, $total);
+            $limits = match ($budgetMode) {
+                Spending::TIGHT => ['effort' => 'low', 'max_rounds' => 6],
+                Spending::RESERVE => ['effort' => 'low', 'max_rounds' => 3],
+                default => [],
+            };
             $reply = $model->reply($system, $conversation, $team->toolsFor($run->agent), function (string $label) use ($run, &$step, &$total): void {
                 // Each tool the agent uses is a real step on its desk.
                 $step = min($step + 1, 250);
                 $total = max($total, $step + 1);
                 $run->moveTo($label, $step, $total);
-            });
+            }, $limits);
 
             $run->update(['input_tokens' => $reply['input_tokens'], 'output_tokens' => $reply['output_tokens']]);
 

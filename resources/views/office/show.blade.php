@@ -32,8 +32,9 @@
         @if ($budget)
             <span class="spend-bar" aria-hidden="true"><span style="width:{{ min(100, round(($used ?? 0) * 100)) }}%"></span></span>
             <span class="spend-msg">
-                @if ($level === 'over') Budget used up: agents have stopped thinking until it is raised.
-                @elseif ($level === 'near') Nearly used: {{ round($used * 100) }}%.
+                @if ($level === 'over' && $used >= 1 + config('office.manager_reserve')) Budget and managers' reserve used up: every agent has stopped until you raise it.
+                @elseif ($level === 'over') Budget used up: employees have stopped; managers may use the {{ round(config('office.manager_reserve') * 100) }}% reserve only for what can't wait.
+                @elseif ($level === 'near') Nearly used ({{ round($used * 100) }}%): agents are keeping their answers short.
                 @else ${{ number_format($budget - $month, 2) }} left this month.
                 @endif
             </span>

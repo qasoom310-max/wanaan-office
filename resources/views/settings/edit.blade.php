@@ -4,7 +4,7 @@
     <form class="panel" id="budget" method="POST" action="{{ route('settings.budget') }}" style="max-width:560px">
         @csrf @method('PUT')
         <b>Monthly AI budget</b>
-        <p class="muted" style="margin:0">When this month's spending reaches it, agents stop calling the AI until you raise it. Messages are still saved. These figures are estimates at list prices; the exact bill is in the Anthropic console.</p>
+        <p class="muted" style="margin:0">From 80% every agent keeps its answers short. At 100% employees stop; managers may go up to {{ round(config('office.manager_reserve') * 100) }}% over, only for what can't wait. At {{ 100 + round(config('office.manager_reserve') * 100) }}% everyone stops until you raise it. Messages are always saved. Set your Anthropic console limit at least this high: ${{ $spending->ceiling() !== null ? number_format($spending->ceiling(), 2) : '…' }}. These figures are estimates at list prices; the exact bill is in the Anthropic console.</p>
         <p style="margin:0">This month so far: <b>${{ number_format($spending->thisMonth(), 2) }}</b>@if($spending->budget()) of ${{ number_format($spending->budget(), 2) }}@endif · today ${{ number_format($spending->today(), 2) }}</p>
         <div class="inline-form">
             <input class="field" type="number" name="budget" min="1" max="100000" step="1" value="{{ $spending->budget() }}" placeholder="e.g. 50" aria-label="Monthly budget in US dollars" required>

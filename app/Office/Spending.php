@@ -15,6 +15,18 @@ class Spending
 {
     public const BUDGET = 'monthly_budget_usd';
 
+    /** Plenty left: work as usual. */
+    public const NORMAL = 'normal';
+
+    /** Near the budget: speak less, look things up only when needed. */
+    public const TIGHT = 'tight';
+
+    /** Over the budget, a manager on the reserve: only what is really needed, very short. */
+    public const RESERVE = 'reserve';
+
+    /** No more spending for this agent until the owner raises the budget. */
+    public const STOPPED = 'stopped';
+
     public function costOf(int $inputTokens, int $outputTokens): float
     {
         [$in, $out] = config('office.prices')[config('office.model')] ?? [0, 0];
@@ -74,12 +86,39 @@ class Spending
         return is_numeric($value) && (float) $value > 0 ? (float) $value : null;
     }
 
-    /** True once this month's spending has reached the owner's budget. */
-    public function isOverBudget(): bool
+    public function isManager(string $agent): bool
+    {
+        return (bool) (config("office.agents.{$agent}.manager") ?? false);
+    }
+
+    /**
+     * How an agent may spend right now, from the share of the budget already used:
+     * everyone speaks less near the budget; employees stop at it; managers may use the
+     * reserve above it only when it is really needed; nobody goes past the reserve.
+     */
+    public function modeFor(string $agent): string
+    {
+        $used = $this->used();
+
+        if ($used === null || $used < config('office.budget_warning')) {
+            return self::NORMAL;
+        }
+        if ($used < 1) {
+            return self::TIGHT;
+        }
+        if ($this->isManager($agent) && $used < 1 + config('office.manager_reserve')) {
+            return self::RESERVE;
+        }
+
+        return self::STOPPED;
+    }
+
+    /** The most anyone may spend this month: the budget plus the managers' reserve. */
+    public function ceiling(): ?float
     {
         $budget = $this->budget();
 
-        return $budget !== null && $this->thisMonth() >= $budget;
+        return $budget === null ? null : $budget * (1 + config('office.manager_reserve'));
     }
 
     /** Share of the budget used, 0..1+, or null without a budget. */

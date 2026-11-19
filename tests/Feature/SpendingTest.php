@@ -43,24 +43,63 @@ class SpendingTest extends TestCase
         $this->assertSame(['acc', 'sec'], array_keys($spending->byAgentThisMonth()));
     }
 
-    public function test_once_the_budget_is_used_up_agents_stop_calling_the_ai_and_say_so(): void
+    public function test_each_agent_spends_by_the_rules_for_its_rank(): void
+    {
+        Setting::write(Spending::BUDGET, '10');
+        $spending = app(Spending::class);
+
+        $this->spent('sec', 1_000_000, 0); // $4 = 40%
+        $this->assertSame(Spending::NORMAL, $spending->modeFor('acc'));
+
+        $this->spent('sec', 1_000_000, 0); // $8 = 80%
+        $this->assertSame(Spending::TIGHT, $spending->modeFor('acc'));
+        $this->assertSame(Spending::TIGHT, $spending->modeFor('fin'));
+
+        $this->spent('sec', 500_000, 0); // $10 = 100%
+        $this->assertSame(Spending::STOPPED, $spending->modeFor('acc'), 'An employee stops at the budget.');
+        $this->assertSame(Spending::RESERVE, $spending->modeFor('fin'), 'A manager may use the reserve.');
+
+        $this->spent('sec', 750_000, 0); // $13 = 130%
+        $this->assertSame(Spending::STOPPED, $spending->modeFor('fin'), 'Nobody goes past the reserve.');
+        $this->assertEqualsWithDelta(13.0, $spending->ceiling(), 0.0001);
+    }
+
+    public function test_near_the_budget_agents_are_told_to_speak_less_and_work_lighter(): void
     {
         $owner = User::factory()->owner()->create();
-        Setting::write(Spending::BUDGET, '5');
-        $this->spent('acc', 1_000_000, 100_000);
+        Setting::write(Spending::BUDGET, '10');
+        $this->spent('sec', 2_100_000, 0); // 84%
 
         $this->actingAs($owner)->postJson(route('office.chat'), ['channel' => 'direct:acc', 'body' => 'Check the drafts.'])->assertOk();
 
+        $this->assertSame(1, $this->model->calls);
+        $this->assertStringContainsString('Speak less', $this->model->lastInstructions);
+        $this->assertSame(['effort' => 'low', 'max_rounds' => 6], $this->model->lastLimits);
+    }
+
+    public function test_over_the_budget_an_employee_stops_and_a_manager_answers_from_the_reserve(): void
+    {
+        $owner = User::factory()->owner()->create();
+        Setting::write(Spending::BUDGET, '5');
+        $this->spent('sec', 1_250_000, 0); // $5 = 100%
+
+        $this->actingAs($owner)->postJson(route('office.chat'), ['channel' => 'direct:acc', 'body' => 'Check the drafts.'])->assertOk();
         $this->assertSame(0, $this->model->calls);
         $this->assertStringContainsString('AI budget ($5.00) is used up', Message::where('agent', 'acc')->sole()->body);
+        $this->assertStringContainsString('Managers may still answer', Message::where('agent', 'acc')->sole()->body);
         $this->assertTrue(Message::where('body', 'Check the drafts.')->exists());
+
+        $this->actingAs($owner)->postJson(route('office.chat'), ['channel' => 'direct:fin', 'body' => 'Is the supplier payment safe?'])->assertOk();
+        $this->assertSame(1, $this->model->calls);
+        $this->assertStringContainsString('small reserve', $this->model->lastInstructions);
+        $this->assertSame(['effort' => 'low', 'max_rounds' => 3], $this->model->lastLimits);
     }
 
     public function test_a_meeting_over_budget_gets_one_notice_and_everyone_still_reads(): void
     {
         $owner = User::factory()->owner()->create();
         Setting::write(Spending::BUDGET, '1');
-        $this->spent('acc', 1_000_000, 0);
+        $this->spent('acc', 1_000_000, 0); // 400%: past the reserve too
 
         $this->actingAs($owner)->postJson(route('office.chat'), ['channel' => 'everyone', 'body' => 'Team, read this.'])->assertOk();
 
