@@ -3,6 +3,7 @@
 namespace App\Office\Tools;
 
 use App\Models\AgentRun;
+use App\Models\Fact;
 use App\Models\Idea;
 use App\Models\Message;
 use App\Models\Question;
@@ -79,17 +80,57 @@ class OfficeTools
                 if ($question === '') {
                     return 'Not added: the question was empty.';
                 }
-                $open = Question::where('agent', $agent)->whereNull('answered_at');
-                if ((clone $open)->whereRaw('lower(question) = ?', [mb_strtolower($question)])->exists()) {
-                    return 'Already on the Questions page; waiting for the owner.';
+
+                // Never ask the owner twice: compare with every question ever asked
+                // (by any agent, answered or not) and every confirmed fact.
+                foreach (Question::orderBy('id')->get() as $earlier) {
+                    if (! self::sameQuestion($question, $earlier->question)) {
+                        continue;
+                    }
+                    if (! $earlier->isOpen()) {
+                        return 'Not added: the owner already answered this. Their answer: "'.$earlier->answer.'". Use it and do not ask again.';
+                    }
+
+                    return 'Not added: it is already on the Questions page, waiting for the owner ('.$this->team->title($earlier->agent).' asked it).';
                 }
-                if ($open->count() >= Question::OPEN_PER_AGENT) {
+                foreach (Fact::orderBy('id')->get() as $fact) {
+                    if (self::sameQuestion($question, $fact->text)) {
+                        return 'Not added: a confirmed fact already answers this: "'.$fact->text.'". Use it and do not ask again.';
+                    }
+                }
+
+                if (Question::where('agent', $agent)->whereNull('answered_at')->count() >= Question::OPEN_PER_AGENT) {
                     return 'Not added: you already have '.Question::OPEN_PER_AGENT.' open questions. Wait for answers first.';
                 }
                 Question::create(['agent' => $agent, 'question' => mb_substr($question, 0, 500), 'why' => mb_substr(trim((string) ($in['why'] ?? '')), 0, 500)]);
 
                 return 'Added to the owner\'s Questions page.';
             });
+    }
+
+    /**
+     * True when two questions ask the same thing in other words: most of the meaningful
+     * words of the shorter one appear in the other (English or Arabic).
+     */
+    public static function sameQuestion(string $a, string $b): bool
+    {
+        $words = function (string $text): array {
+            $text = mb_strtolower($text);
+            $text = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text) ?? '';
+            $stop = ['the', 'and', 'for', 'are', 'what', 'which', 'how', 'many', 'much', 'can', 'does', 'did', 'you', 'our', 'your', 'with', 'from', 'that', 'this', 'there', 'their', 'have', 'has', 'should', 'would', 'will', 'into', 'before', 'after', 'about', 'every', 'each', 'any', 'who', 'when', 'where', 'why', 'not', 'yet', 'please', 'know', 'want', 'need'];
+
+            return array_values(array_unique(array_filter(explode(' ', $text), fn (string $w): bool => mb_strlen($w) >= 3 && ! in_array($w, $stop, true))));
+        };
+
+        $x = $words($a);
+        $y = $words($b);
+        if ($x === [] || $y === []) {
+            return false;
+        }
+
+        $shared = count(array_intersect($x, $y));
+
+        return $shared / min(count($x), count($y)) >= 0.7;
     }
 
     /**

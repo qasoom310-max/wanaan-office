@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AgentRun;
+use App\Models\Fact;
 use App\Models\Idea;
 use App\Models\Question;
 use App\Models\Setting;
@@ -112,9 +113,37 @@ class ConnectionsTest extends TestCase
         foreach (['Which clients?', 'Which tone?', 'Which days?'] as $question) {
             $this->assertSame('Added to the owner\'s Questions page.', ($ask->run)(['question' => $question, 'why' => 'Posts.']));
         }
-        $this->assertStringContainsString('Already on the Questions page', ($ask->run)(['question' => 'Which tone?', 'why' => 'x']));
+        $this->assertStringContainsString('already on the Questions page', ($ask->run)(['question' => 'Which tone?', 'why' => 'x']));
         $this->assertStringContainsString('Not added', ($ask->run)(['question' => 'A fourth?', 'why' => 'x']));
         $this->assertSame(3, Question::where('agent', 'txt')->count());
+    }
+
+    public function test_an_answered_question_is_never_asked_again_even_in_other_words_or_by_another_agent(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $question = Question::create(['agent' => 'acc', 'question' => 'How many days can an entry stay in draft before it counts as late?', 'why' => 'Fairness.']);
+        $this->actingAs($owner)->post(route('questions.answer', $question), ['answer' => '3 days']);
+
+        $ask = collect(app(Team::class)->toolsFor('fin'))->firstWhere('name', 'office_ask_owner');
+        $reply = ($ask->run)(['question' => 'After how many days in draft is an entry counted late?', 'why' => 'x']);
+
+        $this->assertStringContainsString('already answered', $reply);
+        $this->assertStringContainsString('3 days', $reply);
+        $this->assertSame(1, Question::count());
+
+        // A genuinely new question still goes through.
+        $this->assertSame('Added to the owner\'s Questions page.', ($ask->run)(['question' => 'Above what amount must a payment wait for approval?', 'why' => 'x']));
+    }
+
+    public function test_a_question_a_fact_already_answers_is_not_asked(): void
+    {
+        $owner = User::factory()->owner()->create();
+        Fact::create(['text' => 'Deposits are refunded within 7 days of the car coming back.', 'confirmed_by' => $owner->id]);
+
+        $ask = collect(app(Team::class)->toolsFor('rent'))->firstWhere('name', 'office_ask_owner');
+
+        $this->assertStringContainsString('a confirmed fact already answers', ($ask->run)(['question' => 'Within how many days are deposits refunded after the car comes back?', 'why' => 'x']));
+        $this->assertSame(0, Question::count());
     }
 
     public function test_managers_and_it_can_ask_it_for_improvements_that_wait_for_the_owner_but_employees_cannot(): void
