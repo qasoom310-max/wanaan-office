@@ -6,6 +6,7 @@ use App\Models\AgentRun;
 use App\Models\Fact;
 use App\Models\Idea;
 use App\Models\Message;
+use App\Models\MessageFile;
 use App\Models\Question;
 use App\Office\Spending;
 use App\Office\Team;
@@ -62,6 +63,25 @@ class OfficeTools
                     ]);
                 }),
         ];
+    }
+
+    /**
+     * Open a file attached earlier in this same conversation (never another chat's).
+     */
+    public function openFile(string $channel, ?int $ownerId): AgentTool
+    {
+        return new AgentTool('office_open_file', 'Open a file attached earlier in this conversation (a picture, PDF, spreadsheet or text file), by its file number.',
+            ['type' => 'object', 'properties' => ['file_id' => ['type' => 'integer', 'description' => 'The file number, as shown next to "Attached earlier".']], 'required' => ['file_id']],
+            fn (array $in): string => 'Opening an attached file',
+            function (array $in) use ($channel, $ownerId): string|array {
+                $file = MessageFile::with('message')->find((int) ($in['file_id'] ?? 0));
+                $message = $file?->message;
+                if ($file === null || $message->channel !== $channel || $message->owner_id !== $ownerId) {
+                    return 'No such file in this conversation.';
+                }
+
+                return $file->contentBlocks();
+            });
     }
 
     /**

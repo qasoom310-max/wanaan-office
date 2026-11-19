@@ -135,3 +135,13 @@ input.field, textarea.field { font: 14px inherit; font-family: inherit; backgrou
 .spend-over { border-color: var(--bad); background: var(--bad-soft); } .spend-over .spend-bar span { background: var(--bad); } .spend-over .spend-msg { color: var(--bad); font-weight: 600; }
 .spend-none .spend-msg { color: var(--warn); }
 .spend .btn { margin-inline-start: auto; }
+.attach { padding: 6px 9px; display: inline-flex; align-items: center; cursor: pointer; }
+.attached { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
+.attached:empty { display: none; }
+.chip-file { font-size: 12px; background: var(--sunk); border-radius: 12px; padding: 2px 4px 2px 10px; display: inline-flex; align-items: center; gap: 4px; }
+.chip-file button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; line-height: 1; }
+.m .files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.m .file { display: inline-block; font-size: 12px; padding: 4px 8px; border-radius: 6px; background: color-mix(in srgb, var(--surface) 70%, transparent); color: inherit; text-decoration: underline; }
+.m .file small { opacity: .7; }
+.m .file-img img { display: block; max-width: 180px; max-height: 140px; border-radius: 6px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

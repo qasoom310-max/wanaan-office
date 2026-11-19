@@ -41,7 +41,12 @@ if (dataEl) {
         const working = mine.filter((r) => !r.waiting);
         const waiting = mine.length - working.length;
 
-        b.box.innerHTML = (b.msgs.map((m) => `<div class="m ${m.mine ? 'u' : 'a'}">${priv && !m.mine ? '' : `<span class="who">${esc(m.author)}</span>`}${esc(m.body)}<span class="t">${esc(when(m.at))}</span>${receipt(m)}</div>`).join('')
+        const files = (m) => (m.files || []).length
+            ? `<span class="files">${m.files.map((f) => f.image
+                ? `<a href="${esc(f.url)}" target="_blank" rel="noopener" class="file-img"><img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`
+                : `<a href="${esc(f.url)}" target="_blank" rel="noopener" class="file">${esc(f.name)} <small>${Math.max(1, Math.round(f.size / 1024))} KB</small></a>`).join('')}</span>`
+            : '';
+        b.box.innerHTML = (b.msgs.map((m) => `<div class="m ${m.mine ? 'u' : 'a'}">${priv && !m.mine ? '' : `<span class="who">${esc(m.author)}</span>`}${esc(m.body)}${files(m)}<span class="t">${esc(when(m.at))}</span>${receipt(m)}</div>`).join('')
             + (waiting ? `<div class="m a typing"><span>${waiting} more waiting for their turn</span></div>` : '')
             + working.map((r) => `<div class="m a typing ${r.stuck ? 'stuck' : ''}"><span class="who">${esc(r.name)}</span>${r.stuck ? '' : '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>'}<span>${esc(r.stuck ? `Stuck on: ${r.step || 'working'} (${Math.round(r.seconds / 60)} min)` : (r.step || 'Working') + '…')}</span></div>`).join(''))
             || '<div class="empty">No messages yet. Write the first one.</div>';
@@ -135,7 +140,21 @@ if (dataEl) {
     boxes.forEach((b) => {
         const form = b.el.querySelector('[data-compose]');
         const text = form.querySelector('textarea');
-        const button = form.querySelector('button');
+        const button = form.querySelector('button[type=submit]');
+        const picker = form.querySelector('[data-files]');
+        const shelf = form.querySelector('[data-attached]');
+        let chosen = [];
+        const showChosen = () => {
+            shelf.innerHTML = chosen.map((f, i) => `<span class="chip-file">${esc(f.name)} <button type="button" data-drop="${i}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
+            shelf.querySelectorAll('[data-drop]').forEach((x) => x.addEventListener('click', () => { chosen.splice(Number(x.dataset.drop), 1); showChosen(); }));
+        };
+        picker.addEventListener('change', () => {
+            const tooBig = [...picker.files].filter((f) => f.size > 10 * 1024 * 1024);
+            chosen = [...chosen, ...[...picker.files].filter((f) => f.size <= 10 * 1024 * 1024)].slice(0, 5);
+            picker.value = '';
+            showChosen();
+            if (tooBig.length) shelf.insertAdjacentHTML('beforeend', `<span class="send-err">${esc(tooBig.map((f) => f.name).join(', '))}: more than 10 MB, not attached.</span>`);
+        });
 
         text.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
@@ -144,22 +163,31 @@ if (dataEl) {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const body = text.value.trim();
-            if (!body) return;
+            if (!body && !chosen.length) return;
             button.disabled = true;
             form.querySelector('.send-err')?.remove();
             try {
+                const payload = new FormData();
+                payload.append('channel', b.channel);
+                payload.append('body', body);
+                chosen.forEach((f) => payload.append('files[]', f));
                 const res = await fetch(data.chatUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-                    body: JSON.stringify({ channel: b.channel, body }),
+                    headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
+                    body: payload,
                 });
-                if (!res.ok) throw new Error(String(res.status));
+                if (!res.ok) {
+                    const reason = res.status === 422 ? ((await res.json()).message || '') : '';
+                    throw new Error(reason);
+                }
                 // Cleared only once the server has saved it.
                 text.value = '';
+                chosen = [];
+                showChosen();
                 b.forceEnd = true;
                 await poll();
             } catch (err) {
-                form.insertAdjacentHTML('beforeend', '<span class="send-err">Not sent. Your text is still here; try again.</span>');
+                form.insertAdjacentHTML('beforeend', `<span class="send-err">Not sent${err.message ? ': ' + esc(err.message) : ''}. Your text and files are still here; try again.</span>`);
             } finally {
                 button.disabled = false;
             }

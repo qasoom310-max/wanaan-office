@@ -94,7 +94,7 @@ class Team
      *
      * @return list<AgentTool>
      */
-    public function toolsFor(string $agent): array
+    public function toolsFor(string $agent, ?string $channel = null, ?int $ownerId = null): array
     {
         $sources = $this->connectedSources($agent);
         $office = app(OfficeTools::class);
@@ -110,7 +110,11 @@ class Team
             array_push($tools, ...$office->reading());
         }
 
-        // Every agent may ask the owner; managers and IT may also ask IT for improvements.
+        // Every agent may open files from its own conversation and ask the owner;
+        // managers and IT may also ask IT for improvements.
+        if ($channel !== null) {
+            $tools[] = $office->openFile($channel, $ownerId);
+        }
         $tools[] = $office->askOwner($agent);
         if (($this->get($agent)['manager'] ?? false) || $agent === 'it') {
             $tools[] = $office->requestIt($agent);

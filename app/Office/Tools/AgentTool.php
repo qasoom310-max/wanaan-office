@@ -13,7 +13,7 @@ class AgentTool
     /**
      * @param  array<string, mixed>  $schema  JSON schema of the input
      * @param  Closure(array<string, mixed>): string  $step
-     * @param  Closure(array<string, mixed>): string  $run  returns what the agent reads back
+     * @param  Closure(array<string, mixed>): (string|list<array<string, mixed>>)  $run  returns what the agent reads back: text, or content blocks (a picture or PDF)
      */
     public function __construct(
         public string $name,

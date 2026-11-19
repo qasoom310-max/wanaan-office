@@ -93,7 +93,7 @@ class RunAgent implements ShouldQueue
             if ($team->searchesWeb($run->agent)) {
                 $limits['web_search'] = true;
             }
-            $reply = $model->reply($system, $conversation, $team->toolsFor($run->agent), function (string $label) use ($run, &$step, &$total): void {
+            $reply = $model->reply($system, $conversation, $team->toolsFor($run->agent, $run->channel, $run->owner_id), function (string $label) use ($run, &$step, &$total): void {
                 // Each tool the agent uses is a real step on its desk.
                 $step = min($step + 1, 250);
                 $total = max($total, $step + 1);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AgentRun;
 use App\Models\Message;
+use App\Models\MessageFile;
 use App\Models\MessageRead;
 use App\Office\Channels;
 use App\Office\Team;
@@ -26,7 +27,7 @@ class StateController extends Controller
             if (! is_string($channel) || ! $channels->isValid($channel)) {
                 continue;
             }
-            $messages[$channel] = Message::with('user')->visibleIn($channel, $user)
+            $messages[$channel] = Message::with(['user', 'files'])->visibleIn($channel, $user)
                 ->where('id', '>', (int) $lastId)->orderBy('id')->limit(200)->get()
                 ->map(fn (Message $message): array => self::shape($message, $team))->all();
         }
@@ -67,7 +68,7 @@ class StateController extends Controller
     }
 
     /**
-     * @return array{id: int, mine: bool, author: string, body: string, at: string}
+     * @return array{id: int, mine: bool, author: string, body: string, at: string, files: list<array{name: string, url: string, image: bool, size: int}>}
      */
     public static function shape(Message $message, Team $team): array
     {
@@ -77,6 +78,12 @@ class StateController extends Controller
             'author' => $message->isFromAgent() ? $team->label($message->agent) : ($message->user?->name ?? 'Someone'),
             'body' => $message->body,
             'at' => $message->created_at->toIso8601String(),
+            'files' => $message->files->map(fn (MessageFile $file): array => [
+                'name' => $file->name,
+                'url' => route('office.file', $file),
+                'image' => $file->isImage(),
+                'size' => $file->size,
+            ])->values()->all(),
         ];
     }
 }

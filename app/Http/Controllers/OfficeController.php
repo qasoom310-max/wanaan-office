@@ -62,7 +62,7 @@ class OfficeController extends Controller
      */
     private function latest(string $channel, User $user, Team $team): array
     {
-        return Message::with('user')->visibleIn($channel, $user)
+        return Message::with(['user', 'files'])->visibleIn($channel, $user)
             ->orderByDesc('id')->limit(self::PAGE)->get()->reverse()->values()
             ->map(fn (Message $message): array => StateController::shape($message, $team))->all();
     }

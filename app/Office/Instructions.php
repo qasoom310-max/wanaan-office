@@ -19,6 +19,9 @@ use App\Models\Question;
  */
 class Instructions
 {
+    /** Messages from the end of the conversation whose files are shown in full. */
+    private const FILES_SHOWN_FROM_LAST = 3;
+
     public function __construct(private Team $team, private Spending $spending) {}
 
     public function office(): string
@@ -61,19 +64,32 @@ class Instructions
      */
     public function conversation(string $channel, ?int $ownerId): array
     {
-        $messages = Message::with('user')->where('channel', $channel)
+        $messages = Message::with(['user', 'files'])->where('channel', $channel)
             ->when($ownerId === null, fn ($query) => $query->whereNull('owner_id'), fn ($query) => $query->where('owner_id', $ownerId))
             ->orderByDesc('id')->limit(config('office.history'))->get()->reverse()->values();
 
+        // Files in the latest messages are shown as they are; older ones by name only,
+        // so an old attachment does not make every answer more expensive.
+        $showFrom = max(0, $messages->count() - self::FILES_SHOWN_FROM_LAST);
+
         $turns = [];
-        foreach ($messages as $message) {
+        foreach ($messages as $index => $message) {
             $author = $message->isFromAgent() ? $this->team->label($message->agent) : ($message->user?->name ?? 'Someone').' (owner)';
-            $turns[] = ['role' => 'user', 'content' => [['type' => 'text', 'text' => "[{$author}] {$message->body}"]]];
+            $content = [['type' => 'text', 'text' => "[{$author}] {$message->body}"]];
+            foreach ($message->files as $file) {
+                if ($index >= $showFrom) {
+                    array_push($content, ...$file->contentBlocks());
+                } else {
+                    $content[] = ['type' => 'text', 'text' => "[Attached earlier: {$file->name}, file #{$file->id}. Open it with office_open_file if you need it.]"];
+                }
+            }
+            $turns[] = ['role' => 'user', 'content' => $content];
         }
 
         if ($turns !== []) {
             $last = count($turns) - 1;
-            $turns[$last]['content'][0]['cacheControl'] = ['type' => 'ephemeral'];
+            $lastBlock = count($turns[$last]['content']) - 1;
+            $turns[$last]['content'][$lastBlock]['cacheControl'] = ['type' => 'ephemeral'];
         }
 
         return $turns;

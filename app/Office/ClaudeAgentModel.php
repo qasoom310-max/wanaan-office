@@ -130,7 +130,7 @@ class ClaudeAgentModel implements AgentModel
                     $isError = true;
                 }
 
-                if (mb_strlen($content) > self::MAX_RESULT) {
+                if (is_string($content) && mb_strlen($content) > self::MAX_RESULT) {
                     $content = mb_substr($content, 0, self::MAX_RESULT).' [cut short: ask for fewer days]';
                 }
 

@@ -87,7 +87,13 @@
             </div>
             <div class="msgs" data-msgs aria-live="polite"></div>
             <form class="compose" data-compose>
-                <textarea class="field" rows="2" maxlength="8000" required placeholder="Give the team an instruction… everyone reads it (@Name to ask just one)"></textarea>
+                <div class="attached" data-attached></div>
+                <label class="btn ghost attach" title="Attach files (pictures, PDF, Excel, CSV, text · up to 5, 10 MB each)">
+                    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14.5 9.5l-5.6 5.6a3.5 3.5 0 01-5-5l6.4-6.4a2.3 2.3 0 013.3 3.3l-6.3 6.3a1.2 1.2 0 01-1.7-1.7l5.6-5.6"/></svg>
+                    <span class="sr-only">Attach files</span>
+                    <input type="file" multiple hidden data-files accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.csv,.txt,.xlsx,.xls">
+                </label>
+                <textarea class="field" rows="2" maxlength="8000" placeholder="Give the team an instruction… everyone reads it (@Name to ask just one)"></textarea>
                 <button class="btn" type="submit">Send</button>
             </form>
         </section>
@@ -110,7 +116,13 @@
             </div>
             <div class="msgs" data-msgs aria-live="polite"></div>
             <form class="compose" data-compose>
-                <textarea class="field" rows="2" maxlength="8000" required placeholder="Write to {{ $team->displayName($agent) }} alone… (Enter sends, Shift+Enter new line)"></textarea>
+                <div class="attached" data-attached></div>
+                <label class="btn ghost attach" title="Attach files (pictures, PDF, Excel, CSV, text · up to 5, 10 MB each)">
+                    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14.5 9.5l-5.6 5.6a3.5 3.5 0 01-5-5l6.4-6.4a2.3 2.3 0 013.3 3.3l-6.3 6.3a1.2 1.2 0 01-1.7-1.7l5.6-5.6"/></svg>
+                    <span class="sr-only">Attach files</span>
+                    <input type="file" multiple hidden data-files accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.csv,.txt,.xlsx,.xls">
+                </label>
+                <textarea class="field" rows="2" maxlength="8000" placeholder="Write to {{ $team->displayName($agent) }} alone… (Enter sends, Shift+Enter new line)"></textarea>
                 <button class="btn" type="submit">Send</button>
             </form>
         </section>
