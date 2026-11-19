@@ -148,7 +148,9 @@ class OfficeTools
      */
     public function askOwner(string $agent): AgentTool
     {
-        return new AgentTool('office_ask_owner', 'Put a question on the owner\'s Questions page, when only the owner can give the answer and your work depends on it. Their answer becomes a fact you will always read. At most '.Question::OPEN_PER_AGENT.' open at a time.',
+        $limit = $this->spending->isManager($agent) ? 'As a manager you may ask as many as your work needs, one question each.' : 'At most '.Question::OPEN_PER_AGENT.' open at a time.';
+
+        return new AgentTool('office_ask_owner', 'Put a question on the owner\'s Questions page, when only the owner can give the answer and your work depends on it. Their answer becomes a fact you will always read. '.$limit,
             ['type' => 'object', 'properties' => [
                 'question' => ['type' => 'string', 'description' => 'One clear question.'],
                 'why' => ['type' => 'string', 'description' => 'What it blocks, in one sentence.'],
@@ -178,7 +180,8 @@ class OfficeTools
                     }
                 }
 
-                if (Question::where('agent', $agent)->whereNull('answered_at')->count() >= Question::OPEN_PER_AGENT) {
+                // Managers may ask as much as they need; employees keep a few open at a time.
+                if (! $this->spending->isManager($agent) && Question::where('agent', $agent)->whereNull('answered_at')->count() >= Question::OPEN_PER_AGENT) {
                     return 'Not added: you already have '.Question::OPEN_PER_AGENT.' open questions. Wait for answers first.';
                 }
                 Question::create(['agent' => $agent, 'question' => mb_substr($question, 0, 500), 'why' => mb_substr(trim((string) ($in['why'] ?? '')), 0, 500)]);

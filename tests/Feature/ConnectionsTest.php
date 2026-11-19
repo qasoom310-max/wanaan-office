@@ -9,6 +9,7 @@ use App\Models\Question;
 use App\Models\Setting;
 use App\Models\User;
 use App\Office\AgentModel;
+use App\Office\Instructions;
 use App\Office\Seo\SeoClient;
 use App\Office\Spending;
 use App\Office\Team;
@@ -125,6 +126,20 @@ class ConnectionsTest extends TestCase
         $activity = ($tools['office_team_activity']->run)(['days' => 2]);
         $this->assertStringContainsString('what is open?', $activity);
         $this->assertStringNotContainsString('salary of Ali', $activity);
+    }
+
+    public function test_managers_may_ask_as_many_questions_as_they_need_and_every_agent_knows_its_waiting_ones(): void
+    {
+        $ask = collect(app(Team::class)->toolsFor('fin'))->firstWhere('name', 'office_ask_owner');
+
+        foreach (['Which bank received Trust Services transfers?', 'What is the Bahrain Cab arrangement?', 'Are family food transfers drawings?', 'Who approves petty cash above 50?', 'Is the Al Salam account the main one?'] as $question) {
+            $this->assertSame('Added to the owner\'s Questions page.', ($ask->run)(['question' => $question, 'why' => 'Books.']));
+        }
+        $this->assertSame(5, Question::where('agent', 'fin')->count());
+
+        $own = app(Instructions::class)->agent('fin', 'direct:fin');
+        $this->assertStringContainsString('What is the Bahrain Cab arrangement?', $own);
+        $this->assertStringContainsString('as many as your work needs', $own);
     }
 
     public function test_any_agent_can_ask_the_owner_but_only_three_at_a_time(): void
