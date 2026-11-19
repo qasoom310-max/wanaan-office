@@ -61,15 +61,22 @@ class ErpTest extends TestCase
         $this->assertSame([], $team->toolsFor('acc'));
     }
 
-    public function test_once_connected_only_the_agents_given_the_erp_can_read_it(): void
+    public function test_once_connected_each_agent_reads_only_its_own_section(): void
     {
         $this->connect();
         $team = app(Team::class);
+        $names = fn (string $agent): array => array_map(fn ($tool) => $tool->name, $team->toolsFor($agent));
 
         $this->assertTrue($team->hasData('acc'));
-        $this->assertContains('erp_journal_entries', array_map(fn ($tool) => $tool->name, $team->toolsFor('acc')));
-        $this->assertFalse($team->hasData('limo'));
+        $this->assertTrue($team->hasData('limo'));
+        $this->assertTrue($team->hasData('rent'));
+        $this->assertFalse($team->hasData('fin'));
         $this->assertSame([], $team->toolsFor('sec'));
+
+        $this->assertContains('erp_journal_entries', $names('acc'));
+        $this->assertNotContains('erp_limousine_trips', $names('acc'));
+        $this->assertSame(['erp_companies', 'erp_staff', 'erp_activity', 'erp_limousine_trips', 'erp_limousine_invoices', 'erp_limousine_expenses'], $names('limo'));
+        $this->assertSame(['erp_companies', 'erp_staff', 'erp_activity', 'erp_rental_orders', 'erp_rental_fleet'], $names('rent'));
     }
 
     public function test_the_accountant_reads_every_page_of_entries_and_each_lookup_is_a_step_on_its_desk(): void
@@ -114,7 +121,7 @@ class ErpTest extends TestCase
         Http::fake(['erp.test/*' => Http::response(['error' => 'Missing, unknown or revoked office key.'], 401)]);
 
         $this->expectExceptionMessage('the ERP refused the office key');
-        app(ErpTools::class)->all()[1]->run->__invoke(['company_id' => 1]);
+        app(ErpTools::class)->forSections(['accounting'])[1]->run->__invoke(['company_id' => 1]);
     }
 
     public function test_the_connect_command_saves_the_connection_and_checks_each_company(): void

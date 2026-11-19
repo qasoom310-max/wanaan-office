@@ -20,7 +20,21 @@ class ErpTools
     public function __construct(private ErpClient $erp) {}
 
     /**
+     * The tools for the ERP sections an agent may read; every agent with the ERP also
+     * gets the company list, the staff names and the activity log.
+     *
+     * @param  list<string>  $sections  accounting, limousine, rental
      * @return list<AgentTool>
+     */
+    public function forSections(array $sections): array
+    {
+        $groups = array_filter($this->all(), fn (string $section): bool => $section === 'common' || in_array($section, $sections, true), ARRAY_FILTER_USE_KEY);
+
+        return array_merge(...array_values($groups));
+    }
+
+    /**
+     * @return array<string, list<AgentTool>>
      */
     public function all(): array
     {
@@ -28,41 +42,92 @@ class ErpTools
         $from = ['type' => 'string', 'description' => 'First day, YYYY-MM-DD (optional).'];
         $to = ['type' => 'string', 'description' => 'Last day, YYYY-MM-DD, included (optional).'];
 
+        $day = ['from' => $from, 'to' => $to];
+
         return [
-            new AgentTool(
-                'erp_companies',
-                'List the companies (ERP workspaces) you may read, with each one\'s timezone, current time and whether it has accounting. Call this first.',
-                ['type' => 'object', 'properties' => new \stdClass],
-                fn (): string => 'Opening the ERP: companies',
-                fn (): string => $this->json($this->companies()),
-            ),
-            new AgentTool(
-                'erp_staff',
-                'Everyone with an account in one company: id, name, admin, accountant, paused. Use it to put names to user ids.',
-                ['type' => 'object', 'properties' => ['company_id' => $company], 'required' => ['company_id']],
-                fn (array $in): string => 'Opening the ERP: staff of '.$this->companyName((int) $in['company_id']),
-                fn (array $in): string => $this->json($this->erp->get('staff', (int) $in['company_id'])['data'] ?? []),
-            ),
-            new AgentTool(
-                'erp_activity',
-                'The audit trail of one company: who did what and when (created, updated, deleted, signed in…), oldest first. Filter by days and by action.',
-                ['type' => 'object', 'properties' => [
-                    'company_id' => $company, 'from' => $from, 'to' => $to,
-                    'action' => ['type' => 'string', 'description' => 'Only this action, e.g. created, updated, deleted, login (optional).'],
-                ], 'required' => ['company_id']],
-                fn (array $in): string => 'Opening the ERP: activity of '.$this->companyName((int) $in['company_id']),
-                fn (array $in): string => $this->json($this->pages('activity', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null, 'action' => $in['action'] ?? null])),
-            ),
-            new AgentTool(
-                'erp_journal_entries',
-                'Accounting journal entries of one company by accounting date: number, date, reference, who made it, draft or posted, when it was created and posted, debit and credit totals and whether it balances.',
-                ['type' => 'object', 'properties' => [
-                    'company_id' => $company, 'from' => $from, 'to' => $to,
-                    'state' => ['type' => 'string', 'enum' => ['draft', 'posted'], 'description' => 'Only drafts or only posted entries (optional).'],
-                ], 'required' => ['company_id']],
-                fn (array $in): string => 'Opening the ERP: journal entries of '.$this->companyName((int) $in['company_id']),
-                fn (array $in): string => $this->json($this->pages('accounting/journal-entries', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null, 'state' => $in['state'] ?? null])),
-            ),
+            'common' => [
+                new AgentTool(
+                    'erp_companies',
+                    'List the companies (ERP workspaces) you may read, with each one\'s timezone, current time and whether it has accounting. Call this first.',
+                    ['type' => 'object', 'properties' => new \stdClass],
+                    fn (): string => 'Opening the ERP: companies',
+                    fn (): string => $this->json($this->companies()),
+                ),
+                new AgentTool(
+                    'erp_staff',
+                    'Everyone with an account in one company: id, name, admin, accountant, paused. Use it to put names to user ids.',
+                    ['type' => 'object', 'properties' => ['company_id' => $company], 'required' => ['company_id']],
+                    fn (array $in): string => 'Opening the ERP: staff of '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->erp->get('staff', (int) $in['company_id'])['data'] ?? []),
+                ),
+                new AgentTool(
+                    'erp_activity',
+                    'The audit trail of one company: who did what and when (created, updated, deleted, signed in…), oldest first. Filter by days and by action.',
+                    ['type' => 'object', 'properties' => [
+                        'company_id' => $company, 'from' => $from, 'to' => $to,
+                        'action' => ['type' => 'string', 'description' => 'Only this action, e.g. created, updated, deleted, login (optional).'],
+                    ], 'required' => ['company_id']],
+                    fn (array $in): string => 'Opening the ERP: activity of '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->pages('activity', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null, 'action' => $in['action'] ?? null])),
+                ),
+            ],
+            'accounting' => [
+                new AgentTool(
+                    'erp_journal_entries',
+                    'Accounting journal entries of one company by accounting date: number, date, reference, who made it, draft or posted, when it was created and posted, debit and credit totals and whether it balances.',
+                    ['type' => 'object', 'properties' => [
+                        'company_id' => $company, 'from' => $from, 'to' => $to,
+                        'state' => ['type' => 'string', 'enum' => ['draft', 'posted'], 'description' => 'Only drafts or only posted entries (optional).'],
+                    ], 'required' => ['company_id']],
+                    fn (array $in): string => 'Opening the ERP: journal entries of '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->pages('accounting/journal-entries', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null, 'state' => $in['state'] ?? null])),
+                ),
+            ],
+            'limousine' => [
+                new AgentTool(
+                    'erp_limousine_trips',
+                    'Limousine trips of one company by start day: reference, booking, customer, from/to, start time, status (queue, confirmed, active, completed, cancelled), car, driver, price, driver payment, outside company and its cost, cancellation reason and refund.',
+                    ['type' => 'object', 'properties' => ['company_id' => $company, ...$day,
+                        'status' => ['type' => 'string', 'enum' => ['queue', 'confirmed', 'active', 'completed', 'cancelled'], 'description' => 'Only trips in this status (optional).'],
+                    ], 'required' => ['company_id']],
+                    fn (array $in): string => 'Opening the ERP: limousine trips of '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->pages('limousine/trips', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null, 'status' => $in['status'] ?? null])),
+                ),
+                new AgentTool(
+                    'erp_limousine_invoices',
+                    'Limousine invoices of one company by issue day: customer, booking, total, paid, balance, status (unpaid, partial, paid) and days overdue.',
+                    ['type' => 'object', 'properties' => ['company_id' => $company, ...$day,
+                        'status' => ['type' => 'string', 'enum' => ['unpaid', 'partial', 'paid'], 'description' => 'Only invoices in this status (optional).'],
+                    ], 'required' => ['company_id']],
+                    fn (array $in): string => 'Opening the ERP: limousine invoices of '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->pages('limousine/invoices', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null, 'status' => $in['status'] ?? null])),
+                ),
+                new AgentTool(
+                    'erp_limousine_expenses',
+                    'Limousine section expenses of one company by day: category, amount, VAT, payee, driver, and whether a bill is attached.',
+                    ['type' => 'object', 'properties' => ['company_id' => $company, ...$day], 'required' => ['company_id']],
+                    fn (array $in): string => 'Opening the ERP: limousine expenses of '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->pages('limousine/expenses', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null])),
+                ),
+            ],
+            'rental' => [
+                new AgentTool(
+                    'erp_rental_orders',
+                    'Rent-a-car rentals of one company that overlap the days asked (a rental running across the period counts): customer, car, dates, state (draft, active, closed, cancelled), price, balance, payment, deposit and what happened to it, kilometres, damage, fuel, extra charges, fines, and who made it.',
+                    ['type' => 'object', 'properties' => ['company_id' => $company, ...$day,
+                        'state' => ['type' => 'string', 'enum' => ['draft', 'active', 'closed', 'cancelled'], 'description' => 'Only rentals in this state (optional).'],
+                    ], 'required' => ['company_id']],
+                    fn (array $in): string => 'Opening the ERP: rentals of '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->pages('rental/orders', (int) $in['company_id'], ['from' => $in['from'] ?? null, 'to' => $in['to'] ?? null, 'state' => $in['state'] ?? null])),
+                ),
+                new AgentTool(
+                    'erp_rental_fleet',
+                    'The rent-a-car fleet of one company: every car with its state, prices, monthly target, kilometres, next service, and registration and insurance expiry.',
+                    ['type' => 'object', 'properties' => ['company_id' => $company], 'required' => ['company_id']],
+                    fn (array $in): string => 'Opening the ERP: the fleet of '.$this->companyName((int) $in['company_id']),
+                    fn (array $in): string => $this->json($this->erp->get('rental/fleet', (int) $in['company_id'])['data'] ?? []),
+                ),
+            ],
         ];
     }
 

@@ -2,7 +2,8 @@
 
 /*
 | The team. Each agent is the same AI with its own job, its own rules and its own
-| data. `data` lists the sources an agent may read ("erp": the Wanaan ERP, read-only);
+| data. `data` lists the sources an agent may read ("erp": the Wanaan ERP, read-only,
+| limited to the sections in `erp`: accounting, limousine, rental);
 | a source counts only once it is connected in Settings. An agent with none connected
 | is "Talk only" and must say so instead of inventing numbers. `phase` is when it gets
 | its real data and scheduled work.
@@ -55,6 +56,7 @@ return [
             'role' => 'Checks every entry. Weekly report and delays',
             'phase' => 1,
             'data' => ['erp'],
+            'erp' => ['accounting'],
             'brief' => 'You are the main accountant. You check every accounting entry made by the human accountants, find entries left in draft too long, unbalanced or unusual entries, and delays by staff, and write a weekly report. You never change any record.',
         ],
         'fin' => [
@@ -72,7 +74,8 @@ return [
             'team' => 'sections',
             'role' => 'Trips, drivers, invoices. Weekly section report',
             'phase' => 2,
-            'data' => [],
+            'data' => ['erp'],
+            'erp' => ['limousine'],
             'brief' => 'You manage the limousine section: trips, drivers, cars, invoices and corporate customers. You know the rules of the work, report weekly in the shape the owner wants, defend your section\'s needs, and ask IT for improvements when the data entered is not good enough. Your numbers are always exact; arguing for your section never changes them.',
         ],
         'rent' => [
@@ -81,7 +84,8 @@ return [
             'team' => 'sections',
             'role' => 'Fleet, rentals, deposits. Weekly section report',
             'phase' => 2,
-            'data' => [],
+            'data' => ['erp'],
+            'erp' => ['rental'],
             'brief' => 'You manage the rent-a-car section: fleet, rentals, deposits, returns and damage. You know the rules of the work, report weekly in the shape the owner wants, defend your section\'s needs, and ask IT for improvements when the data entered is not good enough. Your numbers are always exact; arguing for your section never changes them.',
         ],
         'it' => [

@@ -18,7 +18,7 @@ class Team
     private ?array $names = null;
 
     /**
-     * @return array<string, array{title: string, team: string, role: string, phase: int, data: list<string>, brief: string}>
+     * @return array<string, array{title: string, team: string, role: string, phase: int, data: list<string>, erp?: list<string>, manager?: bool, brief: string}>
      */
     public function all(): array
     {
@@ -90,7 +90,9 @@ class Team
      */
     public function toolsFor(string $agent): array
     {
-        return in_array('erp', $this->connectedSources($agent), true) ? app(ErpTools::class)->all() : [];
+        return in_array('erp', $this->connectedSources($agent), true)
+            ? app(ErpTools::class)->forSections($this->get($agent)['erp'] ?? [])
+            : [];
     }
 
     /**
