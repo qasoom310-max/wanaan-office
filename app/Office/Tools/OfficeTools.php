@@ -129,8 +129,8 @@ class OfficeTools
     }
 
     /**
-     * True when two questions ask the same thing in other words: most of the meaningful
-     * words of the shorter one appear in the other (English or Arabic).
+     * True when two questions (or two requests) mean the same thing in other words: most
+     * of the meaningful words of the shorter one appear in the other (English or Arabic).
      */
     public static function sameQuestion(string $a, string $b): bool
     {
@@ -170,8 +170,19 @@ class OfficeTools
                 if ($title === '') {
                     return 'Not filed: the request had no title.';
                 }
-                if (Idea::whereRaw('lower(title) = ?', [mb_strtolower($title)])->exists()) {
-                    return 'Already on the IT board.';
+                // Never bring the owner the same request twice: compare by meaning with
+                // every request ever filed, whatever the owner decided.
+                foreach (Idea::orderBy('id')->get() as $earlier) {
+                    if (! self::sameQuestion($title.' '.($in['why'] ?? ''), $earlier->title.' '.$earlier->why) && ! self::sameQuestion($title, $earlier->title)) {
+                        continue;
+                    }
+
+                    return match ($earlier->status) {
+                        'yes' => 'Not filed: the owner already approved this ("'.$earlier->title.'"). It is waiting to be built; do not ask again.',
+                        'done' => 'Not filed: this is already done ("'.$earlier->title.'").',
+                        'later' => 'Not filed: the owner put this off ("'.$earlier->title.'"). Do not ask again unless something important has changed; if it has, say what in the chat instead.',
+                        default => 'Not filed: it is already on the IT board, waiting for the owner ("'.$earlier->title.'").',
+                    };
                 }
                 if (Idea::where('agent', $agent)->where('status', 'wait')->count() >= self::OPEN_REQUESTS_PER_AGENT) {
                     return 'Not filed: you already have '.self::OPEN_REQUESTS_PER_AGENT.' requests waiting for the owner.';

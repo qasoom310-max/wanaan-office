@@ -118,6 +118,24 @@ class ConnectionsTest extends TestCase
         $this->assertSame(3, Question::where('agent', 'txt')->count());
     }
 
+    public function test_an_it_request_the_owner_already_decided_is_never_filed_again(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $approved = Idea::create(['agent' => 'acc', 'title' => 'Record customer WhatsApp chats in the ERP (a shared inbox)', 'why' => 'Reply times cannot be measured.', 'size' => 'Large']);
+        $this->actingAs($owner)->post(route('ideas.decide', $approved), ['status' => 'yes']);
+        $later = Idea::create(['agent' => 'txt', 'title' => 'Apply for LinkedIn company page posting API', 'why' => 'Post automatically.', 'size' => 'Medium']);
+        $this->actingAs($owner)->post(route('ideas.decide', $later), ['status' => 'later']);
+
+        $request = collect(app(Team::class)->toolsFor('fin'))->firstWhere('name', 'office_request_it');
+
+        $this->assertStringContainsString('already approved', ($request->run)(['title' => 'A shared inbox so customer WhatsApp chats are recorded in the ERP', 'why' => 'Measure reply times.', 'size' => 'Large']));
+        $this->assertStringContainsString('put this off', ($request->run)(['title' => 'LinkedIn posting API for the company page', 'why' => 'x', 'size' => 'Medium']));
+        $this->assertSame(2, Idea::count());
+
+        $this->assertStringContainsString('waits for the owner', ($request->run)(['title' => 'Petty cash advances need a receipt photo', 'why' => 'Shortfalls cannot be checked.', 'size' => 'Small']));
+        $this->assertSame(3, Idea::count());
+    }
+
     public function test_an_answered_question_is_never_asked_again_even_in_other_words_or_by_another_agent(): void
     {
         $owner = User::factory()->owner()->create();
@@ -155,7 +173,7 @@ class ConnectionsTest extends TestCase
 
         $request = collect(app(Team::class)->toolsFor('limo'))->firstWhere('name', 'office_request_it');
         $this->assertStringContainsString('waits for the owner', ($request->run)(['title' => 'Driver must enter the end km', 'why' => 'Trips have no mileage.', 'size' => 'Small']));
-        $this->assertStringContainsString('Already on the IT board', ($request->run)(['title' => 'driver must enter the end km', 'why' => 'x', 'size' => 'Small']));
+        $this->assertStringContainsString('already on the IT board', ($request->run)(['title' => 'driver must enter the end km', 'why' => 'x', 'size' => 'Small']));
 
         $idea = Idea::sole();
         $this->assertSame('limo', $idea->agent);

@@ -125,7 +125,7 @@ class Instructions
         }
         $lines[] = 'If your work depends on something only the owner can answer, put it on the Questions page with office_ask_owner (at most '.Question::OPEN_PER_AGENT.' open).';
         if (($profile['manager'] ?? false) || $agent === 'it') {
-            $lines[] = 'When the data or the system is not good enough for your work, push IT for the improvement with office_request_it. It waits on the IT board until the owner approves it.';
+            $lines[] = 'When the data or the system is not good enough for your work, push IT for the improvement with office_request_it. It waits on the IT board until the owner approves it. Never file again what the owner already approved, put off or saw done.';
         }
 
         if ($meeting) {
