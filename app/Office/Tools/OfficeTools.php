@@ -51,6 +51,19 @@ class OfficeTools
                     'budget' => $this->spending->budget(), 'hard_ceiling' => $this->spending->ceiling(),
                     'by_agent' => collect($this->spending->byAgentThisMonth())->mapWithKeys(fn (float $cost, string $agent): array => [$this->team->label($agent) => round($cost, 2)])->all(),
                 ])),
+            new AgentTool('office_monthly_reports', 'The managers\' monthly improvement reports: without report_id, the list (who, which month, title); with report_id, that whole report.',
+                ['type' => 'object', 'properties' => ['report_id' => ['type' => 'integer', 'description' => 'The report to read in full; leave out for the list.']]],
+                fn (array $in): string => isset($in['report_id']) ? 'Reading a manager\'s monthly report' : 'Opening the monthly reports',
+                function (array $in): string {
+                    if (isset($in['report_id'])) {
+                        $report = MonthlyReport::find((int) $in['report_id']);
+
+                        return $report === null ? 'No such report.' : "# {$report->title}\n(".$this->team->label($report->agent).', '.$report->month.")\n\n".$report->body;
+                    }
+
+                    return $this->json(MonthlyReport::orderByDesc('month')->orderBy('agent')->get()
+                        ->map(fn (MonthlyReport $r): array => ['report_id' => $r->id, 'by' => $this->team->exists($r->agent) ? $this->team->label($r->agent) : $r->agent, 'month' => $r->month, 'title' => $r->title])->all());
+                }),
             new AgentTool('office_team_activity', 'What the team did lately: the last messages in the Everyone chat and each agent\'s work in the last days (never anyone\'s private chat).',
                 ['type' => 'object', 'properties' => ['days' => ['type' => 'integer', 'description' => 'How many days back, 1 to 14 (default 2).']]],
                 fn (): string => 'Opening the office: what the team did',

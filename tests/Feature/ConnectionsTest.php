@@ -5,10 +5,12 @@ namespace Tests\Feature;
 use App\Models\AgentRun;
 use App\Models\Fact;
 use App\Models\Idea;
+use App\Models\MonthlyReport;
 use App\Models\Question;
 use App\Models\Setting;
 use App\Models\User;
 use App\Office\AgentModel;
+use App\Office\Erp\ErpClient;
 use App\Office\Instructions;
 use App\Office\Seo\SeoClient;
 use App\Office\Spending;
@@ -87,6 +89,29 @@ class ConnectionsTest extends TestCase
         $this->assertStringContainsString('"id":3', ($tools['seo_plan_article']->run)(['kind' => 'post', 'subject' => 'Bahrain to Riyadh', 'language' => 'en', 'topic_id' => 2, 'scheduled_on' => '2027-02-01']));
         $this->assertStringContainsString('already exists', ($tools['seo_add_section']->run)(['name' => 'Airport transfers']));
         Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && str_contains($request->url(), '/projects/7/content') && $request['topic_id'] === 2);
+    }
+
+    public function test_the_company_developer_knows_the_whole_company_but_no_private_chat(): void
+    {
+        Setting::write(ErpClient::URL, 'https://erp.test');
+        Setting::write(ErpClient::KEY, 'office_x');
+        Setting::write(ErpClient::WORKSPACES, '1');
+        Setting::write(SeoClient::URL, 'https://seo.test');
+        Setting::write(SeoClient::KEY, 'seo_office_test');
+
+        $names = $this->toolNames('dev');
+        foreach (['erp_journal_entries', 'erp_money_in', 'erp_money_out', 'erp_limousine_trips', 'erp_rental_orders', 'erp_rental_fleet', 'seo_campaigns', 'office_monthly_reports', 'office_it_board', 'office_team_activity', 'office_request_it', 'office_monthly_report'] as $tool) {
+            $this->assertContains($tool, $names, $tool);
+        }
+        $this->assertTrue(app(Team::class)->searchesWeb('dev'));
+        $this->assertTrue(app(Spending::class)->isManager('dev'));
+
+        $owner = User::factory()->owner()->create();
+        MonthlyReport::create(['agent' => 'limo', 'month' => now()->format('Y-m'), 'title' => 'Limousine report', 'body' => 'Trips up 12%.']);
+        $reports = collect(app(Team::class)->toolsFor('dev'))->firstWhere('name', 'office_monthly_reports');
+        $list = json_decode(($reports->run)([]), true);
+        $this->assertSame('Limousine report', $list[0]['title']);
+        $this->assertStringContainsString('Trips up 12%', ($reports->run)(['report_id' => $list[0]['report_id']]));
     }
 
     public function test_research_and_planning_search_the_web_and_searches_are_counted_in_spending(): void

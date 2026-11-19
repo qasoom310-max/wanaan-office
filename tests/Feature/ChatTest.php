@@ -98,7 +98,7 @@ class ChatTest extends TestCase
         $this->assertCount(1, array_unique($this->model->systems), 'The shared rules are word for word the same for every agent.');
         $raw = $this->model->rawMessages;
         $this->assertSame('system', end($raw)['role']);
-        $this->assertStringContainsString('You are Gulf Planner', end($raw)['content']);
+        $this->assertStringContainsString('You are Company Developer', end($raw)['content']);
         $this->assertStringContainsString('Your AI spending this month', end($raw)['content']);
         $beforeOwn = $raw[count($raw) - 2];
         $this->assertSame(['type' => 'ephemeral'], $beforeOwn['content'][0]['cacheControl']);
