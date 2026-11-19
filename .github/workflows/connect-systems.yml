@@ -52,6 +52,14 @@ jobs:
             return 1
           }
 
+          # The folder of the Laravel app that has this file (when the address check misses).
+          find_app() {
+            for dir in "$HOME"/domains/*/public_html "$HOME"/domains/*/public_html/* "$HOME"/public_html "$HOME"/public_html/*; do
+              [ -f "$dir/artisan" ] && [ -f "$dir/$1" ] && { echo "$dir"; return 0; }
+            done
+            return 1
+          }
+
           if [ "$DO_ERP" = "true" ]; then
             ERP=$(find_site 'erp.wanaan-bh.com') || { echo "ERP folder not found on this server account."; exit 1; }
             echo "ERP found."
@@ -67,7 +75,7 @@ jobs:
           fi
 
           if [ "$DO_SEO" = "true" ]; then
-            SEO=$(find_site 'seo.wanaan-bh.com') || { echo "SEO folder not found on this server account."; exit 1; }
+            SEO=$(find_site 'seo.wanaan-bh.com') || SEO=$(find_app 'app/Models/Campaign.php') || { echo "SEO folder not found on this server account."; exit 1; }
             echo "SEO system found."
             (cd "$SEO" && $PHP artisan migrate --force >/dev/null 2>&1)
             IDS=$(cd "$SEO" && $PHP artisan tinker --execute='echo implode(" ", App\Models\Project::query()->pluck("id")->all());' 2>/dev/null | tr -cd '0-9 ')
