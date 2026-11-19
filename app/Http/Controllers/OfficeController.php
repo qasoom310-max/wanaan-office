@@ -6,6 +6,7 @@ use App\Models\Message;
 use App\Models\Question;
 use App\Models\User;
 use App\Office\Channels;
+use App\Office\Spending;
 use App\Office\Team;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ class OfficeController extends Controller
     /** Messages loaded at once per chat, newest last. */
     private const PAGE = 200;
 
-    public function show(Request $request, Team $team, Channels $channels): View
+    public function show(Request $request, Team $team, Channels $channels, Spending $spending): View
     {
         $user = $request->user();
         $with = $request->query('with');
@@ -42,6 +43,7 @@ class OfficeController extends Controller
                 $private => $this->latest($private, $user, $team),
             ],
             'reads' => StateController::reads($team),
+            'spending' => $spending,
             'openQuestions' => Question::whereNull('answered_at')->get()->countBy('agent')->all(),
         ]);
     }

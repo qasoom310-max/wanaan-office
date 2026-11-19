@@ -11,6 +11,15 @@
 return [
     'model' => 'claude-opus-5-5',
 
+    // US dollars per million tokens [input, output], to estimate spending. Update when
+    // Anthropic changes its prices; the exact bill is in the Anthropic console.
+    'prices' => [
+        'claude-opus-5-5' => [4.00, 20.00],
+    ],
+
+    // Spending shown as "nearly used" from this share of the monthly budget.
+    'budget_warning' => 0.8,
+
     // Messages from a conversation the agent re-reads before answering.
     'history' => 40,
 

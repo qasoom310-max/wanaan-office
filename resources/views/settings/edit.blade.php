@@ -1,6 +1,25 @@
 @extends('layouts.app', ['title' => 'Settings · Wanaan Office'])
 
 @section('content')
+    <form class="panel" id="budget" method="POST" action="{{ route('settings.budget') }}" style="max-width:560px">
+        @csrf @method('PUT')
+        <b>Monthly AI budget</b>
+        <p class="muted" style="margin:0">When this month's spending reaches it, agents stop calling the AI until you raise it. Messages are still saved. These figures are estimates at list prices; the exact bill is in the Anthropic console.</p>
+        <p style="margin:0">This month so far: <b>${{ number_format($spending->thisMonth(), 2) }}</b>@if($spending->budget()) of ${{ number_format($spending->budget(), 2) }}@endif · today ${{ number_format($spending->today(), 2) }}</p>
+        <div class="inline-form">
+            <input class="field" type="number" name="budget" min="1" max="100000" step="1" value="{{ $spending->budget() }}" placeholder="e.g. 50" aria-label="Monthly budget in US dollars" required>
+            <button class="btn" type="submit">Save budget</button>
+        </div>
+        @php $byAgent = $spending->byAgentThisMonth(); @endphp
+        @if ($byAgent !== [])
+            <div class="list" style="margin-top:4px">
+                @foreach ($byAgent as $agent => $cost)
+                    <div class="meta" style="justify-content:space-between"><span>{{ $team->exists($agent) ? $team->label($agent) : $agent }}</span><b>${{ number_format($cost, 2) }}</b></div>
+                @endforeach
+            </div>
+        @endif
+    </form>
+
     <form class="panel" method="POST" action="{{ route('settings.update') }}" style="max-width:560px">
         @csrf @method('PUT')
         <b>AI key</b>

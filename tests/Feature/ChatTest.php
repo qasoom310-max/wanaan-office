@@ -10,8 +10,6 @@ use App\Models\Message;
 use App\Models\MessageRead;
 use App\Models\User;
 use App\Office\AgentModel;
-use App\Office\Instructions;
-use App\Office\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use LogicException;
 use Tests\Fakes\FakeAgentModel;
@@ -210,7 +208,7 @@ class ChatTest extends TestCase
         $owner = User::factory()->owner()->create();
         $this->send($owner, 'secretary', 'Once only.');
 
-        (new RunAgent(AgentRun::sole()))->handle($this->model, app(Instructions::class), app(Team::class));
+        app()->call([new RunAgent(AgentRun::sole()), 'handle']);
 
         $this->assertSame(1, Message::where('agent', 'sec')->count());
     }

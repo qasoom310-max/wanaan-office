@@ -19,6 +19,30 @@
         @endif
     @endcan
 
+    @php
+        $month = $spending->thisMonth();
+        $budget = $spending->budget();
+        $used = $spending->used();
+        $level = $used === null ? 'none' : ($used >= 1 ? 'over' : ($used >= config('office.budget_warning') ? 'near' : 'ok'));
+    @endphp
+    <div class="spend spend-{{ $level }}" role="status">
+        <span class="spend-l">AI spending</span>
+        <span>Today <b>${{ number_format($spending->today(), 2) }}</b></span>
+        <span>This month <b>${{ number_format($month, 2) }}</b>@if($budget) of ${{ number_format($budget, 2) }}@endif</span>
+        @if ($budget)
+            <span class="spend-bar" aria-hidden="true"><span style="width:{{ min(100, round(($used ?? 0) * 100)) }}%"></span></span>
+            <span class="spend-msg">
+                @if ($level === 'over') Budget used up: agents have stopped thinking until it is raised.
+                @elseif ($level === 'near') Nearly used: {{ round($used * 100) }}%.
+                @else ${{ number_format($budget - $month, 2) }} left this month.
+                @endif
+            </span>
+        @else
+            <span class="spend-msg">No monthly budget set: nothing stops the spending.</span>
+        @endif
+        @can('owner')<a class="btn ghost sm" href="{{ route('settings') }}#budget">{{ $budget ? 'Change budget' : 'Set a budget' }}</a>@endcan
+    </div>
+
     <div class="now" id="now" aria-live="polite"><span class="now-l">Right now</span><span>Nobody is working.</span></div>
 
     @foreach ($team->byTeam() as $teamKey => $agents)
@@ -53,6 +77,8 @@
             <div class="chat-h">
                 <b>Everyone</b>
                 <span class="tag">Team meeting · everyone reads, answers or argues · @Name asks one</span>
+                @php $meeting = $spending->averageMeeting(); @endphp
+                <span class="tag" title="Every agent takes a turn, so a meeting message costs about 12 replies">{{ $meeting !== null ? 'A meeting costs about $'.number_format($meeting, 2) : 'A meeting is about 12 replies' }}</span>
                 <span class="tools"><span class="count" data-count></span><button class="btn ghost sm" type="button" data-big>Bigger</button></span>
             </div>
             <div class="msgs" data-msgs aria-live="polite"></div>

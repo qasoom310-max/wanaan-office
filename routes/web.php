@@ -40,5 +40,6 @@ Route::middleware(['auth', EnsurePasswordChanged::class])->group(function () {
         Route::post('it/{idea}', [IdeaController::class, 'decide'])->name('ideas.decide');
         Route::get('settings', [SettingsController::class, 'edit'])->name('settings');
         Route::put('settings', [SettingsController::class, 'update'])->name('settings.update');
+        Route::put('settings/budget', [SettingsController::class, 'budget'])->name('settings.budget');
     });
 });

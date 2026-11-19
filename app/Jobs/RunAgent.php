@@ -8,6 +8,7 @@ use App\Models\MessageRead;
 use App\Office\AgentModel;
 use App\Office\AgentProblem;
 use App\Office\Instructions;
+use App\Office\Spending;
 use App\Office\Team;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -28,7 +29,7 @@ class RunAgent implements ShouldQueue
 
     public function __construct(public AgentRun $run) {}
 
-    public function handle(AgentModel $model, Instructions $instructions, Team $team): void
+    public function handle(AgentModel $model, Instructions $instructions, Team $team, Spending $spending): void
     {
         // Claimed once: a repeated or duplicated job finds the run taken and does nothing.
         if (AgentRun::whereKey($this->run->id)->whereNull('claimed_at')->update(['claimed_at' => now()]) === 0) {
@@ -47,6 +48,20 @@ class RunAgent implements ShouldQueue
             $run->moveTo('Reading the facts and the conversation', 2, $total);
             $system = $instructions->for($run->agent, $run->channel, $run->meeting);
             $conversation = $instructions->conversation($run->agent, $run->channel, $run->owner_id);
+
+            // Nothing spends past the owner's monthly budget.
+            if ($spending->isOverBudget()) {
+                if ($run->meeting && $run->agent !== 'sec') {
+                    $this->markRead();
+                    $run->update(['status' => AgentRun::DONE, 'step' => null, 'finished_at' => now()]);
+
+                    return;
+                }
+
+                $this->answer('This month\'s AI budget ($'.number_format((float) $spending->budget(), 2).') is used up, so I can\'t think until the owner raises it in Settings. Your message is saved.');
+
+                return;
+            }
 
             if (! $model->isConfigured()) {
                 // One notice per meeting is enough; the others still show they read it.
