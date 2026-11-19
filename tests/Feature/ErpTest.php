@@ -89,9 +89,10 @@ class ErpTest extends TestCase
         $this->actingAs($owner)->postJson(route('office.chat'), ['channel' => 'direct:acc', 'body' => 'Which entries are still in draft?'])->assertOk();
 
         $this->assertSame(['Opening the ERP: companies', 'Opening the ERP: journal entries of Main'], $this->model->steps);
-        $entries = json_decode($this->model->toolResults['erp_journal_entries'], true);
-        $this->assertSame(['DEMO/0001', 'DEMO/0002'], array_column($entries['rows'], 'number'));
-        $this->assertTrue($entries['complete']);
+        $entries = $this->model->toolResults['erp_journal_entries'];
+        $this->assertStringContainsString('Lines: 2, every one read.', $entries);
+        $this->assertStringContainsString('DEMO/0001', $entries);
+        $this->assertStringContainsString('DEMO/0002', $entries);
         $this->assertStringContainsString('erp_ tools (read-only; your sections: accounting)', $this->model->lastInstructions);
         $this->assertSame(AgentRun::DONE, AgentRun::sole()->status);
         $this->assertSame('acc', Message::whereNotNull('agent')->sole()->agent);
@@ -100,6 +101,34 @@ class ErpTest extends TestCase
         Http::assertSent(fn (Request $request): bool => $request->method() === 'GET');
         Http::assertNotSent(fn (Request $request): bool => $request->method() !== 'GET');
         Http::assertSent(fn (Request $request): bool => $request->hasHeader('Authorization', 'Bearer '.self::KEY) && $request->hasHeader('X-Workspace', '1'));
+    }
+
+    public function test_a_long_period_gives_totals_over_every_line_even_when_not_all_lines_fit(): void
+    {
+        $this->connect();
+        $trips = [];
+        for ($i = 1; $i <= 1400; $i++) {
+            $trips[] = ['id' => $i, 'reference' => 'T'.$i, 'customer' => 'Customer '.($i % 7), 'from' => str_repeat('Long pick-up address ', 6), 'to' => 'Riyadh',
+                'start_at' => sprintf('2026-10-%02d %02d:00', 1 + intdiv($i, 50), $i % 24), 'status' => $i % 10 === 0 ? 'cancelled' : 'completed',
+                'driver' => 'Driver '.($i % 5), 'car' => 'Car '.($i % 9), 'net_amount' => 10, 'line_total' => 10, 'driver_payment' => 2, 'outside_cost' => null, 'refund_amount' => null, 'outside_company' => null, 'booking_payment' => 'paid'];
+        }
+        Http::fake(['erp.test/api/office/v1/limousine/trips*' => function (Request $request) use ($trips) {
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+            $after = (int) ($query['after_id'] ?? 0);
+            $page = array_values(array_filter($trips, fn (array $t): bool => $t['id'] > $after));
+            $chunk = array_slice($page, 0, 500);
+
+            return Http::response(['data' => $chunk, 'next_after_id' => count($page) > 500 ? end($chunk)['id'] : null]);
+        }]);
+
+        $tool = collect(app(Team::class)->toolsFor('limo'))->firstWhere('name', 'erp_limousine_trips');
+        $result = ($tool->run)(['company_id' => 1, 'from' => '2026-10-01', 'to' => '2026-11-19']);
+
+        $this->assertStringContainsString('Lines: 1400, every one read.', $result);
+        $this->assertStringContainsString('"net_amount":14000', $result, 'Totals cover every trip.');
+        $this->assertStringContainsString('"cancelled":{"count":140', $result);
+        $this->assertMatchesRegularExpression('/\[Lines 1-\d+ of 1400 shown \(up to start_at 2026-1\d-\d\d \d\d:00\)\. The TOTALS above cover all 1400/', $result);
+        $this->assertLessThan(260000, mb_strlen($result));
     }
 
     public function test_a_company_the_office_may_not_read_is_never_asked_for(): void

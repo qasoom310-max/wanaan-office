@@ -177,3 +177,6 @@ input.field, textarea.field { font: 14px inherit; font-family: inherit; backgrou
 .compose .send-err[hidden] { display: none; }
 .compose .attached { margin-bottom: 6px; }
 @media (max-width: 640px) { .chat { height: 82vh; } .compose-hint { display: none; } }
+.m .body ul { list-style: disc; }
+.m .body ol { list-style: decimal; }
+.compose .compose-text { resize: none; }

@@ -25,7 +25,7 @@ class ClaudeAgentModel implements AgentModel
     private const MAX_ROUNDS = 12;
 
     /** Characters of one tool result passed back, so one answer cannot overflow. */
-    private const MAX_RESULT = 120000;
+    private const MAX_RESULT = 260000;
 
     public function __construct(private ?string $apiKey) {}
 
