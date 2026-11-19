@@ -107,12 +107,26 @@ class OwnerTest extends TestCase
         $this->artisan('office:owner', ['name' => 'Again', 'email' => 'owner@example.test'])->assertFailed();
     }
 
+    public function test_the_3d_office_gets_every_agent_and_the_live_scene(): void
+    {
+        $owner = User::factory()->owner()->create();
+        Question::create(['agent' => 'fin', 'question' => 'Trust Services?', 'why' => 'Books.']);
+        \App\Models\AgentRun::create(['agent' => 'pln', 'channel' => 'everyone', 'status' => 'working', 'step' => 'Answering IT Manager', 'heartbeat_at' => now(), 'input_tokens' => 100000]);
+
+        $this->actingAs($owner)->get(route('office.3d'))->assertOk()->assertSee('Company Developer');
+        $this->actingAs($owner)->getJson(route('office.state', ['scene' => 1]))
+            ->assertOk()
+            ->assertJsonPath('scene.questions.fin', 1)
+            ->assertJsonPath('runs.0.asked_by', 'it')
+            ->assertJsonStructure(['scene' => ['spending', 'questions', 'hour']]);
+    }
+
     public function test_every_page_opens(): void
     {
         $owner = User::factory()->owner()->create();
         $this->artisan('office:owner', ['name' => 'Second', 'email' => 'second@example.test']);
 
-        foreach (['office', 'facts', 'questions', 'ideas', 'settings'] as $page) {
+        foreach (['office', 'office.3d', 'facts', 'questions', 'ideas', 'settings', 'plan', 'reports'] as $page) {
             $this->actingAs($owner)->get(route($page))->assertOk();
         }
     }

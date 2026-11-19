@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'Wanaan Office' }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @stack('head')
 </head>
 <body>
 <div class="wrap">
@@ -18,6 +19,7 @@
             <div class="brand">Wanaan Office <small>Your AI team, one desk each</small></div>
             <nav class="tabs" aria-label="Pages">
                 <a href="{{ route('office') }}" @if(request()->routeIs('office')) aria-current="page" @endif>Office</a>
+                <a href="{{ route('office.3d') }}" @if(request()->routeIs('office.3d')) aria-current="page" @endif>3D office</a>
                 <a href="{{ route('facts') }}" @if(request()->routeIs('facts')) aria-current="page" @endif>Facts</a>
                 <a href="{{ route('questions') }}" @if(request()->routeIs('questions')) aria-current="page" @endif>Questions @if($openQuestions)<span class="n">{{ $openQuestions }}</span>@endif</a>
                 <a href="{{ route('ideas') }}" @if(request()->routeIs('ideas')) aria-current="page" @endif>IT board @if($waitingIdeas)<span class="n">{{ $waitingIdeas }}</span>@endif</a>

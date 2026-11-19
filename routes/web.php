@@ -28,6 +28,7 @@ Route::middleware(['auth', EnsurePasswordChanged::class])->group(function () {
 
     Route::get('office', [OfficeController::class, 'show'])->name('office');
     Route::get('office/history', [OfficeController::class, 'history'])->name('office.history');
+    Route::get('office/3d', [OfficeController::class, 'scene'])->name('office.3d');
     Route::get('office/state', [StateController::class, 'show'])->name('office.state');
     Route::post('office/chat', [ChatController::class, 'store'])->middleware('throttle:30,1')->name('office.chat');
     Route::get('office/files/{file}', [ChatController::class, 'file'])->name('office.file');

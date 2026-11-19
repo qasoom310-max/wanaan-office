@@ -48,6 +48,28 @@ class OfficeController extends Controller
         ]);
     }
 
+    /** The 3D office: the same live data as the desks, as a room. */
+    public function scene(Team $team): View
+    {
+        $agents = collect(array_keys($team->all()))->map(fn (string $agent): array => [
+            'key' => $agent,
+            'name' => $team->displayName($agent),
+            'title' => $team->title($agent),
+            'team' => $team->get($agent)['team'],
+            'manager' => (bool) ($team->get($agent)['manager'] ?? false),
+            'chat' => route('office', ['with' => $agent]).'#chats',
+        ])->values();
+
+        return view('office.scene', [
+            'sceneData' => [
+                'agents' => $agents,
+                'teams' => config('office.teams'),
+                'stateUrl' => route('office.state'),
+                'questionsUrl' => route('questions'),
+            ],
+        ]);
+    }
+
     /** One chat's latest messages, for switching the private chat without reloading. */
     public function history(Request $request, Team $team, Channels $channels): JsonResponse
     {

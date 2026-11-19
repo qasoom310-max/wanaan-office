@@ -189,3 +189,18 @@ input.field, textarea.field { font: 14px inherit; font-family: inherit; backgrou
 .report ul { list-style: disc; padding-inline-start: 22px; } .report ol { list-style: decimal; padding-inline-start: 22px; }
 .report p { margin: 6px 0; } .report table { border-collapse: collapse; margin: 8px 0; } .report td, .report th { border: 1px solid var(--line); padding: 4px 8px; }
 @media print { .top, .no-print { display: none !important; } .report { border: 0; padding: 0; } }
+.scene-wrap { display: grid; grid-template-columns: 1fr 300px; gap: 14px; }
+.scene { position: relative; height: min(76vh, 760px); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: radial-gradient(ellipse at 50% 30%, #1d2a36 0%, #0b1117 70%); }
+.scene canvas { display: block; }
+.scene-fallback { position: absolute; inset: 0; display: grid; place-items: center; color: #cfd8e0; }
+.scene-side { display: grid; gap: 12px; align-content: start; }
+.scene-legend ul { list-style: none; padding: 0; margin: 4px 0; display: grid; gap: 6px; font-size: 13px; }
+.lg { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-inline-end: 6px; }
+.lg-idle { background: #3fc1b6; opacity: .45; } .lg-work { background: #3fc1b6; box-shadow: 0 0 8px #3fc1b6; } .lg-wait { background: #6c7a88; }
+.lg-stuck { background: #f0a050; } .lg-ask { background: linear-gradient(90deg, #8fe3ff, #ffffff); border-radius: 2px; height: 4px; vertical-align: 3px; } .lg-q { background: #ffb547; }
+.pod-label { pointer-events: none; text-align: center; transform: translateY(-6px); }
+.pod-label .n { display: block; font: 600 12px var(--font-sans, system-ui); color: #eaf2f7; text-shadow: 0 1px 4px #000; background: none; padding: 0; }
+.pod-label .s { display: block; font: 11px ui-monospace, monospace; color: #9fe9e1; max-width: 220px; white-space: normal; text-shadow: 0 1px 4px #000; }
+.pod-label .s:empty { display: none; }
+.team-label { font: 600 11px var(--font-sans, system-ui); letter-spacing: .14em; text-transform: uppercase; color: rgba(220, 235, 245, .55); pointer-events: none; }
+@media (max-width: 900px) { .scene-wrap { grid-template-columns: 1fr; } .scene { height: 62vh; } }

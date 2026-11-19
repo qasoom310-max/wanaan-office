@@ -32,6 +32,9 @@ class StateController extends Controller
                 ->map(fn (Message $message): array => self::shape($message, $team))->all();
         }
 
+        /** @var array<string, string> $names display name => agent */
+        $names = collect(array_keys($team->all()))->mapWithKeys(fn (string $agent): array => [$team->displayName($agent) => $agent])->all();
+
         // Only runs this person may see: the shared chat's, and their own private ones.
         $runs = AgentRun::whereIn('status', [AgentRun::WAITING, AgentRun::WORKING])
             ->where(fn ($query) => $query->whereNull('owner_id')->orWhere('owner_id', $user->id))
@@ -43,13 +46,27 @@ class StateController extends Controller
                 'channel' => $run->channel,
                 'step' => $run->step,
                 'waiting' => $run->status === AgentRun::WAITING,
+                'meeting' => (bool) $run->meeting,
+                // A colleague answering shows who asked, so the 3D office can draw the light between them.
+                'asked_by' => str_starts_with((string) $run->step, 'Answering ') ? $names[mb_substr((string) $run->step, 10)] ?? null : null,
                 'step_number' => $run->step_number,
                 'step_total' => $run->step_total,
                 'stuck' => $run->isStuck(),
                 'seconds' => (int) $run->created_at->diffInSeconds(now()),
             ])->all();
 
-        return response()->json(['messages' => $messages, 'runs' => $runs, 'reads' => self::reads($team)]);
+        $payload = ['messages' => $messages, 'runs' => $runs, 'reads' => self::reads($team)];
+
+        // The 3D office also shows each agent's spending and the questions it is waiting on.
+        if ($request->boolean('scene')) {
+            $payload['scene'] = [
+                'spending' => array_map(fn (float $cost): float => round($cost, 2), app(\App\Office\Spending::class)->byAgentThisMonth()),
+                'questions' => \App\Models\Question::whereNull('answered_at')->get()->countBy('agent')->all(),
+                'hour' => (int) now('Asia/Bahrain')->format('G'),
+            ];
+        }
+
+        return response()->json($payload);
     }
 
     /**

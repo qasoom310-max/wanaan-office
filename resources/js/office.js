@@ -109,7 +109,7 @@ if (dataEl) {
         const waiting = runs.length - active.length;
         document.getElementById('now').innerHTML = runs.length
             ? '<span class="now-l live">Right now</span>' + (waiting ? `<span class="now-i">${waiting} waiting for their turn</span>` : '')
-                + active.map((r) => `<span class="now-i ${r.stuck ? 'stuck' : ''}"><b>${esc(r.name)}</b> ${esc((r.step || 'working').toLowerCase())} <span class="bar"><span style="width:${Math.round((r.step_number / Math.max(r.step_total, 1)) * 100)}%"></span></span></span>`).join('')
+                + active.map((r) => `<span class="now-i ${r.stuck ? 'stuck' : ''}"><b>${esc(r.name)}</b> ${esc(r.step || 'Working')} <span class="bar"><span style="width:${Math.round((r.step_number / Math.max(r.step_total, 1)) * 100)}%"></span></span></span>`).join('')
             : '<span class="now-l">Right now</span><span>Nobody is working.</span>';
 
         boxes.forEach(render);
