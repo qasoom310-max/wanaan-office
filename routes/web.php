@@ -25,6 +25,7 @@ Route::middleware(['auth', EnsurePasswordChanged::class])->group(function () {
     Route::put('password', [PasswordController::class, 'update'])->name('password.update');
 
     Route::get('office', [OfficeController::class, 'show'])->name('office');
+    Route::get('office/history', [OfficeController::class, 'history'])->name('office.history');
     Route::get('office/state', [StateController::class, 'show'])->name('office.state');
     Route::post('office/chat', [ChatController::class, 'store'])->middleware('throttle:30,1')->name('office.chat');
 

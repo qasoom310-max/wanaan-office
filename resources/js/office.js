@@ -1,16 +1,17 @@
 /*
- * The office page: chats that never lose a message, and desks that move only when an
- * agent is really working. Everything shown comes from the server; the page polls it.
+ * The office page. Two chats: the Everyone team meeting, and a private chat with
+ * whichever agent you pick. Every message comes from the server and is kept there for
+ * good; the page only shows it. Desks move only when an agent is really working.
  */
 const dataEl = document.getElementById('office-data');
 
 if (dataEl) {
     const data = JSON.parse(dataEl.textContent);
     const csrf = document.querySelector('meta[name="csrf-token"]').content;
-    const chats = {};
     let reads = data.reads || {};
+    let runs = [];
 
-    const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     const when = (iso) => {
         const d = new Date(iso), now = new Date();
         const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -18,50 +19,58 @@ if (dataEl) {
             : d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + hm;
     };
 
-    document.querySelectorAll('[data-channel]').forEach((el) => {
-        const channel = el.dataset.channel;
-        chats[channel] = { el, box: el.querySelector('[data-msgs]'), msgs: data.history[channel] || [], typing: [] };
-    });
+    /** One entry per chat box on the page; a box's channel can change (the private one). */
+    const boxes = [...document.querySelectorAll('[data-channel]')].map((el) => ({
+        el,
+        box: el.querySelector('[data-msgs]'),
+        get channel() { return el.dataset.channel; },
+        msgs: data.history[el.dataset.channel] || [],
+        forceEnd: true,
+    }));
+    const privateBox = boxes.find((b) => b.el.hasAttribute('data-private-chat'));
+    const lastId = (b) => (b.msgs.length ? b.msgs[b.msgs.length - 1].id : 0);
 
-    const lastId = (c) => (c.msgs.length ? c.msgs[c.msgs.length - 1].id : 0);
-
-    function renderChat(channel) {
-        const c = chats[channel];
-        const atEnd = c.box.scrollHeight - c.box.scrollTop - c.box.clientHeight < 40;
-        const priv = channel !== 'everyone';
+    function render(b) {
+        const atEnd = b.box.scrollHeight - b.box.scrollTop - b.box.clientHeight < 40;
+        const priv = b.channel !== 'everyone';
         const receipt = (m) => {
             const names = !priv && m.mine ? (reads[m.id] || []) : [];
             return names.length ? `<span class="t" title="${esc(names.join(', '))}">Read by ${names.length} · ${esc(names.slice(0, 4).join(', '))}${names.length > 4 ? '…' : ''}</span>` : '';
         };
-        const html = c.msgs.map((m) => `<div class="m ${m.mine ? 'u' : 'a'}">${priv && !m.mine ? '' : `<span class="who">${esc(m.author)}</span>`}${esc(m.body)}<span class="t">${esc(when(m.at))}</span>${receipt(m)}</div>`).join('')
-            + (c.waiting ? `<div class="m a typing"><span>${c.waiting} more waiting for their turn</span></div>` : '')
-            + c.typing.map((r) => `<div class="m a typing ${r.stuck ? 'stuck' : ''}"><span class="who">${esc(r.name)}</span>${r.stuck ? '' : '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>'}<span>${esc(r.stuck ? `Stuck on: ${r.step || 'working'} (${Math.round(r.seconds / 60)} min)` : (r.step || 'Working') + '…')}</span></div>`).join('');
-        c.box.innerHTML = html || '<div class="empty">No messages yet. Write the first one.</div>';
-        const mine = c.msgs.filter((m) => m.mine).length;
-        c.el.querySelector('[data-count]').textContent = `${c.msgs.length} messages · ${mine} from you`;
-        if (atEnd || c.forceEnd) { c.box.scrollTop = c.box.scrollHeight; c.forceEnd = false; }
+        const mine = runs.filter((r) => r.channel === b.channel);
+        const working = mine.filter((r) => !r.waiting);
+        const waiting = mine.length - working.length;
+
+        b.box.innerHTML = (b.msgs.map((m) => `<div class="m ${m.mine ? 'u' : 'a'}">${priv && !m.mine ? '' : `<span class="who">${esc(m.author)}</span>`}${esc(m.body)}<span class="t">${esc(when(m.at))}</span>${receipt(m)}</div>`).join('')
+            + (waiting ? `<div class="m a typing"><span>${waiting} more waiting for their turn</span></div>` : '')
+            + working.map((r) => `<div class="m a typing ${r.stuck ? 'stuck' : ''}"><span class="who">${esc(r.name)}</span>${r.stuck ? '' : '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>'}<span>${esc(r.stuck ? `Stuck on: ${r.step || 'working'} (${Math.round(r.seconds / 60)} min)` : (r.step || 'Working') + '…')}</span></div>`).join(''))
+            || '<div class="empty">No messages yet. Write the first one.</div>';
+
+        b.el.querySelector('[data-count]').textContent = `${b.msgs.length} messages · ${b.msgs.filter((m) => m.mine).length} from you`;
+        if (atEnd || b.forceEnd) { b.box.scrollTop = b.box.scrollHeight; b.forceEnd = false; }
     }
 
-    function renderRuns(runs) {
+    function renderRuns() {
         document.querySelectorAll('[data-desk]').forEach((desk) => {
             const run = runs.filter((r) => r.agent === desk.dataset.desk).at(-1);
             desk.classList.toggle('working', !!run && !run.stuck && !run.waiting);
             desk.classList.toggle('stuck', !!run && run.stuck);
-            desk.querySelector('[data-step]').textContent = run ? (run.stuck ? `Stuck on: ${run.step || 'working'}` : run.waiting ? 'Waiting for their turn' : `${run.step || 'Working'}…`) : 'Ready';
+            desk.querySelector('[data-step]').textContent = run
+                ? (run.stuck ? `Stuck on: ${run.step || 'working'}` : run.waiting ? 'Waiting for their turn' : `${run.step || 'Working'}…`)
+                : 'Ready';
+        });
+        document.querySelectorAll('[data-pick]').forEach((pick) => {
+            pick.classList.toggle('working', runs.some((r) => r.agent === pick.dataset.pick && !r.waiting && r.channel === pick.dataset.channelFor));
         });
 
-        const now = document.getElementById('now');
         const active = runs.filter((r) => !r.waiting);
         const waiting = runs.length - active.length;
-        now.innerHTML = runs.length
-            ? '<span class="now-l live">Right now</span>' + (waiting ? `<span class="now-i">${waiting} waiting for their turn</span>` : '') + active.map((r) => `<span class="now-i ${r.stuck ? 'stuck' : ''}"><b>${esc(r.name)}</b> ${esc((r.step || 'working').toLowerCase())} <span class="bar"><span style="width:${Math.round((r.step_number / Math.max(r.step_total, 1)) * 100)}%"></span></span></span>`).join('')
+        document.getElementById('now').innerHTML = runs.length
+            ? '<span class="now-l live">Right now</span>' + (waiting ? `<span class="now-i">${waiting} waiting for their turn</span>` : '')
+                + active.map((r) => `<span class="now-i ${r.stuck ? 'stuck' : ''}"><b>${esc(r.name)}</b> ${esc((r.step || 'working').toLowerCase())} <span class="bar"><span style="width:${Math.round((r.step_number / Math.max(r.step_total, 1)) * 100)}%"></span></span></span>`).join('')
             : '<span class="now-l">Right now</span><span>Nobody is working.</span>';
 
-        Object.entries(chats).forEach(([channel, c]) => {
-            c.typing = runs.filter((r) => r.channel === channel && !r.waiting);
-            c.waiting = runs.filter((r) => r.channel === channel && r.waiting).length;
-            renderChat(channel);
-        });
+        boxes.forEach(render);
     }
 
     let polling = false;
@@ -70,27 +79,61 @@ if (dataEl) {
         polling = true;
         try {
             const params = new URLSearchParams();
-            Object.entries(chats).forEach(([channel, c]) => params.append(`after[${channel}]`, lastId(c)));
+            boxes.forEach((b) => params.append(`after[${b.channel}]`, lastId(b)));
             const res = await fetch(`${data.stateUrl}?${params}`, { headers: { Accept: 'application/json' } });
             if (!res.ok) return;
             const state = await res.json();
-            Object.entries(state.messages).forEach(([channel, msgs]) => {
-                const c = chats[channel];
-                if (!c || !msgs.length) return;
-                const known = new Set(c.msgs.map((m) => m.id));
-                c.msgs.push(...msgs.filter((m) => !known.has(m.id)));
+            boxes.forEach((b) => {
+                const fresh = state.messages[b.channel] || [];
+                const known = new Set(b.msgs.map((m) => m.id));
+                b.msgs.push(...fresh.filter((m) => !known.has(m.id)));
             });
             reads = state.reads || reads;
-            renderRuns(state.runs);
+            runs = state.runs;
+            renderRuns();
         } catch (e) {
-            /* The next poll tries again; nothing on the page is lost. */
+            /* The next poll tries again; nothing is lost. */
         } finally {
             polling = false;
         }
     }
 
-    document.querySelectorAll('[data-compose]').forEach((form) => {
-        const channel = form.closest('[data-channel]').dataset.channel;
+    /** Pick who to talk to alone: that agent's whole private history opens in the box. */
+    async function pick(agent) {
+        const button = document.querySelector(`[data-pick="${agent}"]`);
+        if (!privateBox || !button) return;
+        const channel = button.dataset.channelFor;
+        document.querySelectorAll('[data-pick]').forEach((p) => p.setAttribute('aria-checked', String(p === button)));
+        privateBox.el.querySelector('[data-private-name]').textContent = button.dataset.label;
+        privateBox.el.querySelector('textarea').placeholder = `Write to ${button.dataset.name} alone… (Enter sends, Shift+Enter new line)`;
+        privateBox.el.dataset.channel = channel;
+        privateBox.msgs = [];
+        privateBox.box.innerHTML = '<div class="empty">Opening your chat…</div>';
+        history.replaceState(null, '', `?with=${encodeURIComponent(agent)}#chats`);
+        try {
+            const res = await fetch(`${data.historyUrl}?channel=${encodeURIComponent(channel)}`, { headers: { Accept: 'application/json' } });
+            const json = await res.json();
+            if (privateBox.channel === json.channel) {
+                privateBox.msgs = json.messages;
+                privateBox.forceEnd = true;
+                render(privateBox);
+            }
+        } catch (e) {
+            privateBox.box.innerHTML = '<div class="empty">Could not open this chat. Your messages are safe; try again.</div>';
+        }
+    }
+
+    document.querySelectorAll('[data-pick]').forEach((p) => p.addEventListener('click', () => pick(p.dataset.pick)));
+    document.querySelectorAll('[data-desk]').forEach((desk) => desk.addEventListener('click', (e) => {
+        if (!privateBox) return;
+        e.preventDefault();
+        pick(desk.dataset.desk);
+        privateBox.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        privateBox.el.querySelector('textarea').focus({ preventScroll: true });
+    }));
+
+    boxes.forEach((b) => {
+        const form = b.el.querySelector('[data-compose]');
         const text = form.querySelector('textarea');
         const button = form.querySelector('button');
 
@@ -108,12 +151,12 @@ if (dataEl) {
                 const res = await fetch(data.chatUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
-                    body: JSON.stringify({ channel, body }),
+                    body: JSON.stringify({ channel: b.channel, body }),
                 });
                 if (!res.ok) throw new Error(String(res.status));
                 // Cleared only once the server has saved it.
                 text.value = '';
-                chats[channel].forceEnd = true;
+                b.forceEnd = true;
                 await poll();
             } catch (err) {
                 form.insertAdjacentHTML('beforeend', '<span class="send-err">Not sent. Your text is still here; try again.</span>');
@@ -123,10 +166,10 @@ if (dataEl) {
         });
     });
 
-    document.querySelectorAll('[data-big]').forEach((b) => b.addEventListener('click', () => {
-        const chat = b.closest('.chat');
+    document.querySelectorAll('[data-big]').forEach((btn) => btn.addEventListener('click', () => {
+        const chat = btn.closest('.chat');
         chat.classList.toggle('big');
-        b.textContent = chat.classList.contains('big') ? 'Smaller' : 'Bigger';
+        btn.textContent = chat.classList.contains('big') ? 'Smaller' : 'Bigger';
     }));
 
     // Lock a name only after a second, deliberate click.
@@ -147,7 +190,7 @@ if (dataEl) {
         });
     });
 
-    Object.keys(chats).forEach((channel) => { chats[channel].forceEnd = true; renderChat(channel); });
+    boxes.forEach(render);
     poll();
     const tick = () => setTimeout(async () => { await poll(); tick(); }, document.hidden ? 10000 : 2000);
     tick();

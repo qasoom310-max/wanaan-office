@@ -26,6 +26,12 @@ class Channels
         return 'direct:'.$agent;
     }
 
+    /** The private chat with an agent: the Secretary keeps her own, every other agent its direct chat. */
+    public function privateWith(string $agent): string
+    {
+        return $agent === 'sec' ? Message::SECRETARY : $this->direct($agent);
+    }
+
     /**
      * Who answers a new message: the Secretary in her chat, the agent in its direct
      * chat, and in Everyone the agent mentioned with @, else the Secretary.

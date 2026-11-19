@@ -121,7 +121,10 @@ class ChatTest extends TestCase
         $this->send($owner, 'direct:rent', 'What do you need from me?');
 
         $this->assertSame('rent', Message::whereNotNull('agent')->sole()->agent);
-        $this->actingAs($owner)->get(route('office', ['with' => 'rent']))->assertOk()->assertSee('What do you need from me?');
+        $this->actingAs($owner)->get(route('office', ['with' => 'rent']))->assertOk()->assertSee('What do you need from me?')->assertSee('Private chat with');
+        $this->actingAs($owner)->getJson(route('office.history', ['channel' => 'direct:rent']))->assertOk()->assertJsonCount(2, 'messages');
+        $this->actingAs(User::factory()->create())->getJson(route('office.history', ['channel' => 'direct:rent']))->assertOk()->assertJsonCount(0, 'messages');
+        $this->actingAs($owner)->getJson(route('office.history', ['channel' => 'direct:nobody']))->assertNotFound();
         $this->actingAs($owner)->postJson(route('office.chat'), ['channel' => 'direct:nobody', 'body' => 'Hi'])->assertNotFound();
     }
 

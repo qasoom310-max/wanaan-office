@@ -4,42 +4,64 @@ namespace App\Http\Controllers;
 
 use App\Models\Message;
 use App\Models\Question;
+use App\Models\User;
 use App\Office\Channels;
 use App\Office\Team;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class OfficeController extends Controller
 {
-    /** Messages loaded with the page per chat; older ones load on request. */
-    private const FIRST_PAGE = 200;
+    /** Messages loaded at once per chat, newest last. */
+    private const PAGE = 200;
 
     public function show(Request $request, Team $team, Channels $channels): View
     {
         $user = $request->user();
         $with = $request->query('with');
-        $direct = is_string($with) && $team->exists($with) ? $with : null;
+        $agent = is_string($with) && $team->exists($with) ? $with : 'sec';
+        $private = $channels->privateWith($agent);
 
-        $chats = [Message::SECRETARY, Message::EVERYONE];
-        if ($direct !== null) {
-            $chats[] = $channels->direct($direct);
-        }
+        // How many messages each private chat already holds, for the picker.
+        $counts = Message::where('owner_id', $user->id)->where('channel', '!=', Message::EVERYONE)
+            ->selectRaw('channel, count(*) as total')->groupBy('channel')->pluck('total', 'channel');
 
-        $history = [];
-        foreach ($chats as $channel) {
-            $history[$channel] = Message::with('user')->visibleIn($channel, $user)
-                ->orderByDesc('id')->limit(self::FIRST_PAGE)->get()->reverse()->values()
-                ->map(fn (Message $message): array => StateController::shape($message, $team))->all();
+        $pickerCounts = [];
+        foreach (array_keys($team->all()) as $key) {
+            $pickerCounts[$key] = (int) ($counts[$channels->privateWith($key)] ?? 0);
         }
 
         return view('office.show', [
             'team' => $team,
-            'channels' => $channels,
-            'direct' => $direct,
-            'chats' => $chats,
-            'history' => $history,
+            'agent' => $agent,
+            'privateChannel' => $private,
+            'pickerCounts' => $pickerCounts,
+            'history' => [
+                Message::EVERYONE => $this->latest(Message::EVERYONE, $user, $team),
+                $private => $this->latest($private, $user, $team),
+            ],
             'reads' => StateController::reads($team),
             'openQuestions' => Question::whereNull('answered_at')->get()->countBy('agent')->all(),
         ]);
+    }
+
+    /** One chat's latest messages, for switching the private chat without reloading. */
+    public function history(Request $request, Team $team, Channels $channels): JsonResponse
+    {
+        $channel = (string) $request->query('channel');
+        abort_unless($channels->isValid($channel), 404);
+
+        return response()->json(['channel' => $channel, 'messages' => $this->latest($channel, $request->user(), $team)]);
+    }
+
+    /**
+     * @return list<array{id: int, mine: bool, author: string, body: string, at: string}>
+     */
+    private function latest(string $channel, User $user, Team $team): array
+    {
+        return Message::with('user')->visibleIn($channel, $user)
+            ->orderByDesc('id')->limit(self::PAGE)->get()->reverse()->values()
+            ->map(fn (Message $message): array => StateController::shape($message, $team))->all();
     }
 }
