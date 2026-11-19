@@ -46,6 +46,7 @@
 
     <div class="now" id="now" aria-live="polite"><span class="now-l">Right now</span><span>Nobody is working.</span></div>
 
+    @php $deskSpend = $spending->byAgentThisMonth(); @endphp
     @foreach ($team->byTeam() as $teamKey => $agents)
         <section class="team">
             <h2>{{ config('office.teams.'.$teamKey) }}</h2>
@@ -65,6 +66,7 @@
                                 <span class="tag">Talk only</span>
                             @endif
                             <span class="tag">Phase {{ $profile['phase'] }}</span>
+                            <span class="tag" title="AI spending this month">${{ number_format($deskSpend[$deskAgent] ?? 0, 2) }}</span>
                         </span>
                         <span class="state" data-state><span class="dot"></span><span data-step>Ready</span></span>
                     </a>
