@@ -85,16 +85,22 @@
                 <span class="tag" title="Every agent takes a turn, so a meeting message costs about 12 replies">{{ $meeting !== null ? 'A meeting costs about $'.number_format($meeting, 2) : 'A meeting is about 12 replies' }}</span>
                 <span class="tools"><span class="count" data-count></span><button class="btn ghost sm" type="button" data-big>Bigger</button></span>
             </div>
-            <div class="msgs" data-msgs aria-live="polite"></div>
+            <div class="msgs-wrap"><div class="msgs" data-msgs aria-live="polite"></div><button type="button" class="jump" data-jump hidden>↓ New messages</button></div>
             <form class="compose" data-compose>
+                <div class="send-err" data-error role="alert" hidden></div>
                 <div class="attached" data-attached></div>
-                <label class="btn ghost attach" title="Attach files (pictures, PDF, Excel, CSV, text · up to 5, 10 MB each)">
-                    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14.5 9.5l-5.6 5.6a3.5 3.5 0 01-5-5l6.4-6.4a2.3 2.3 0 013.3 3.3l-6.3 6.3a1.2 1.2 0 01-1.7-1.7l5.6-5.6"/></svg>
-                    <span class="sr-only">Attach files</span>
-                    <input type="file" multiple hidden data-files accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.csv,.txt,.xlsx,.xls">
-                </label>
-                <textarea class="field" rows="2" maxlength="8000" placeholder="Give the team an instruction… everyone reads it (@Name to ask just one)"></textarea>
-                <button class="btn" type="submit">Send</button>
+                <div class="compose-row">
+                    <label class="icon-btn" title="Attach files (pictures, PDF, Excel, CSV, text · up to 5, 10 MB each)">
+                        <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14.5 9.5l-5.6 5.6a3.5 3.5 0 01-5-5l6.4-6.4a2.3 2.3 0 013.3 3.3l-6.3 6.3a1.2 1.2 0 01-1.7-1.7l5.6-5.6"/></svg>
+                        <span class="sr-only">Attach files</span>
+                        <input type="file" multiple hidden data-files accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.csv,.txt,.xlsx,.xls">
+                    </label>
+                    <textarea class="compose-text" rows="1" maxlength="8000" data-text placeholder="Give the team an instruction… everyone reads it (@Name to ask just one)"></textarea>
+                    <button class="send-btn" type="submit" title="Send (Enter)" aria-label="Send">
+                        <svg viewBox="0 0 20 20" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.1 2.6a.75.75 0 01.8-.1l13.5 6.8a.75.75 0 010 1.4L3.9 17.5a.75.75 0 01-1-.9L4.7 10 2.9 3.4a.75.75 0 01.2-.8zM6 10.75l-1.2 4.4L14.6 10 4.8 4.85 6 9.25h5a.75.75 0 010 1.5H6z"/></svg>
+                    </button>
+                </div>
+                <div class="compose-hint">Enter to send · Shift+Enter for a new line</div>
             </form>
         </section>
 
@@ -114,16 +120,22 @@
                     </button>
                 @endforeach
             </div>
-            <div class="msgs" data-msgs aria-live="polite"></div>
+            <div class="msgs-wrap"><div class="msgs" data-msgs aria-live="polite"></div><button type="button" class="jump" data-jump hidden>↓ New messages</button></div>
             <form class="compose" data-compose>
+                <div class="send-err" data-error role="alert" hidden></div>
                 <div class="attached" data-attached></div>
-                <label class="btn ghost attach" title="Attach files (pictures, PDF, Excel, CSV, text · up to 5, 10 MB each)">
-                    <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14.5 9.5l-5.6 5.6a3.5 3.5 0 01-5-5l6.4-6.4a2.3 2.3 0 013.3 3.3l-6.3 6.3a1.2 1.2 0 01-1.7-1.7l5.6-5.6"/></svg>
-                    <span class="sr-only">Attach files</span>
-                    <input type="file" multiple hidden data-files accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.csv,.txt,.xlsx,.xls">
-                </label>
-                <textarea class="field" rows="2" maxlength="8000" placeholder="Write to {{ $team->displayName($agent) }} alone… (Enter sends, Shift+Enter new line)"></textarea>
-                <button class="btn" type="submit">Send</button>
+                <div class="compose-row">
+                    <label class="icon-btn" title="Attach files (pictures, PDF, Excel, CSV, text · up to 5, 10 MB each)">
+                        <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14.5 9.5l-5.6 5.6a3.5 3.5 0 01-5-5l6.4-6.4a2.3 2.3 0 013.3 3.3l-6.3 6.3a1.2 1.2 0 01-1.7-1.7l5.6-5.6"/></svg>
+                        <span class="sr-only">Attach files</span>
+                        <input type="file" multiple hidden data-files accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.csv,.txt,.xlsx,.xls">
+                    </label>
+                    <textarea class="compose-text" rows="1" maxlength="8000" data-text placeholder="Write to {{ $team->displayName($agent) }} alone…"></textarea>
+                    <button class="send-btn" type="submit" title="Send (Enter)" aria-label="Send">
+                        <svg viewBox="0 0 20 20" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M3.1 2.6a.75.75 0 01.8-.1l13.5 6.8a.75.75 0 010 1.4L3.9 17.5a.75.75 0 01-1-.9L4.7 10 2.9 3.4a.75.75 0 01.2-.8zM6 10.75l-1.2 4.4L14.6 10 4.8 4.85 6 9.25h5a.75.75 0 010 1.5H6z"/></svg>
+                    </button>
+                </div>
+                <div class="compose-hint">Enter to send · Shift+Enter for a new line</div>
             </form>
         </section>
     </div>

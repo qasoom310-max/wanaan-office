@@ -145,3 +145,35 @@ input.field, textarea.field { font: 14px inherit; font-family: inherit; backgrou
 .m .file small { opacity: .7; }
 .m .file-img img { display: block; max-width: 180px; max-height: 140px; border-radius: 6px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ── Chat, second version: the writing box always visible, replies formatted ── */
+.chat { display: flex; flex-direction: column; height: min(78vh, 760px); }
+.chat.big { height: calc(100vh - 120px); }
+.msgs-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
+.msgs { flex: 1; height: auto; min-height: 0; padding: 16px; gap: 12px; }
+.chat.big .msgs { height: auto; }
+.m { max-width: 88%; line-height: 1.55; font-size: 14.5px; }
+.m.a { max-width: 92%; }
+.m .body p { margin: 0; }
+.m .body .md-gap { height: 8px; }
+.m .body .md-h { font-weight: 700; margin-top: 4px; }
+.m .body ul, .m .body ol { margin: 4px 0; padding-inline-start: 20px; }
+.m .body li { margin: 2px 0; }
+.m .body code { font: 12.5px ui-monospace, monospace; background: color-mix(in srgb, var(--fg) 8%, transparent); padding: 1px 4px; border-radius: 4px; }
+.m .body a { color: inherit; text-decoration: underline; }
+.m.a .body strong { color: var(--fg); }
+.jump { position: absolute; inset-inline-end: 16px; bottom: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--accent); border-radius: 16px; padding: 4px 12px; font: 600 12px inherit; font-family: inherit; cursor: pointer; box-shadow: 0 2px 8px rgb(0 0 0 / .12); }
+.compose { display: block; padding: 10px 12px 8px; border-top: 1px solid var(--line); background: var(--surface); border-radius: 0 0 10px 10px; }
+.compose-row { display: flex; align-items: flex-end; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 6px 6px 6px 8px; }
+.compose-row:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.compose-text { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--fg); font: 15px inherit; font-family: inherit; line-height: 1.45; resize: none; padding: 6px 2px; max-height: 200px; }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; color: var(--muted); cursor: pointer; flex: none; }
+.icon-btn:hover { background: var(--sunk); color: var(--fg); }
+.send-btn { width: 38px; height: 38px; border-radius: 10px; border: 0; background: var(--accent); color: var(--surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none; }
+.send-btn:disabled { opacity: .5; cursor: default; }
+.compose.is-sending .send-btn { animation: breathe 1s ease-in-out infinite; }
+.compose-hint { font-size: 11px; color: var(--muted); margin-top: 4px; padding-inline-start: 4px; }
+.compose .send-err { display: block; width: auto; margin-bottom: 8px; background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.compose .send-err[hidden] { display: none; }
+.compose .attached { margin-bottom: 6px; }
+@media (max-width: 640px) { .chat { height: 82vh; } .compose-hint { display: none; } }

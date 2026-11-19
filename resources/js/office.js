@@ -19,6 +19,37 @@ if (dataEl) {
             : d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + hm;
     };
 
+    /**
+     * The agents write in light Markdown. Turned into safe HTML: everything is escaped
+     * first, then only bold, italics, code, headings, lists and http(s) links come back.
+     */
+    const inline = (t) => t
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    const markdown = (raw) => {
+        const out = [];
+        let list = null;
+        const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
+        for (const line of esc(raw).split('\n')) {
+            const bullet = line.match(/^\s*[-•*]\s+(.*)$/);
+            const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+            const heading = line.match(/^\s*#{1,4}\s+(.*)$/);
+            if (bullet || numbered) {
+                const kind = bullet ? 'ul' : 'ol';
+                if (list !== kind) { close(); out.push(`<${kind}>`); list = kind; }
+                out.push(`<li>${inline((bullet || numbered)[1])}</li>`);
+                continue;
+            }
+            close();
+            if (heading) { out.push(`<p class="md-h">${inline(heading[1])}</p>`); continue; }
+            out.push(line.trim() === '' ? '<p class="md-gap"></p>' : `<p>${inline(line)}</p>`);
+        }
+        close();
+        return out.join('');
+    };
+
     /** One entry per chat box on the page; a box's channel can change (the private one). */
     const boxes = [...document.querySelectorAll('[data-channel]')].map((el) => ({
         el,
@@ -46,13 +77,19 @@ if (dataEl) {
                 ? `<a href="${esc(f.url)}" target="_blank" rel="noopener" class="file-img"><img src="${esc(f.url)}" alt="${esc(f.name)}" loading="lazy"></a>`
                 : `<a href="${esc(f.url)}" target="_blank" rel="noopener" class="file">${esc(f.name)} <small>${Math.max(1, Math.round(f.size / 1024))} KB</small></a>`).join('')}</span>`
             : '';
-        b.box.innerHTML = (b.msgs.map((m) => `<div class="m ${m.mine ? 'u' : 'a'}">${priv && !m.mine ? '' : `<span class="who">${esc(m.author)}</span>`}${esc(m.body)}${files(m)}<span class="t">${esc(when(m.at))}</span>${receipt(m)}</div>`).join('')
+        b.box.innerHTML = (b.msgs.map((m) => `<div class="m ${m.mine ? 'u' : 'a'}">${priv && !m.mine ? '' : `<span class="who">${esc(m.author)}</span>`}<div class="body">${m.mine ? esc(m.body).replace(/\n/g, '<br>') : markdown(m.body)}</div>${files(m)}<span class="t">${esc(when(m.at))}</span>${receipt(m)}</div>`).join('')
             + (waiting ? `<div class="m a typing"><span>${waiting} more waiting for their turn</span></div>` : '')
             + working.map((r) => `<div class="m a typing ${r.stuck ? 'stuck' : ''}"><span class="who">${esc(r.name)}</span>${r.stuck ? '' : '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>'}<span>${esc(r.stuck ? `Stuck on: ${r.step || 'working'} (${Math.round(r.seconds / 60)} min)` : (r.step || 'Working') + '…')}</span></div>`).join(''))
             || '<div class="empty">No messages yet. Write the first one.</div>';
 
         b.el.querySelector('[data-count]').textContent = `${b.msgs.length} messages · ${b.msgs.filter((m) => m.mine).length} from you`;
-        if (atEnd || b.forceEnd) { b.box.scrollTop = b.box.scrollHeight; b.forceEnd = false; }
+        const jump = b.el.querySelector('[data-jump]');
+        if (atEnd || b.forceEnd) {
+            b.box.scrollTop = b.box.scrollHeight; b.forceEnd = false; b.seen = b.msgs.length;
+            if (jump) jump.hidden = true;
+        } else if (jump && b.msgs.length > (b.seen || 0)) {
+            jump.hidden = false;
+        }
     }
 
     function renderRuns() {
@@ -110,7 +147,7 @@ if (dataEl) {
         const channel = button.dataset.channelFor;
         document.querySelectorAll('[data-pick]').forEach((p) => p.setAttribute('aria-checked', String(p === button)));
         privateBox.el.querySelector('[data-private-name]').textContent = button.dataset.label;
-        privateBox.el.querySelector('textarea').placeholder = `Write to ${button.dataset.name} alone… (Enter sends, Shift+Enter new line)`;
+        privateBox.el.querySelector('[data-text]').placeholder = `Write to ${button.dataset.name} alone…`;
         privateBox.el.dataset.channel = channel;
         privateBox.msgs = [];
         privateBox.box.innerHTML = '<div class="empty">Opening your chat…</div>';
@@ -134,38 +171,48 @@ if (dataEl) {
         e.preventDefault();
         pick(desk.dataset.desk);
         privateBox.el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        privateBox.el.querySelector('textarea').focus({ preventScroll: true });
+        privateBox.el.querySelector('[data-text]').focus({ preventScroll: true });
     }));
 
     boxes.forEach((b) => {
         const form = b.el.querySelector('[data-compose]');
-        const text = form.querySelector('textarea');
+        const text = form.querySelector('[data-text]');
         const button = form.querySelector('button[type=submit]');
         const picker = form.querySelector('[data-files]');
         const shelf = form.querySelector('[data-attached]');
+        const errorBox = form.querySelector('[data-error]');
+        const jump = b.el.querySelector('[data-jump]');
         let chosen = [];
+        let sending = false;
+
+        const showError = (message) => { errorBox.textContent = message; errorBox.hidden = !message; };
+        const grow = () => { text.style.height = 'auto'; text.style.height = Math.min(text.scrollHeight, 200) + 'px'; };
         const showChosen = () => {
             shelf.innerHTML = chosen.map((f, i) => `<span class="chip-file">${esc(f.name)} <button type="button" data-drop="${i}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
             shelf.querySelectorAll('[data-drop]').forEach((x) => x.addEventListener('click', () => { chosen.splice(Number(x.dataset.drop), 1); showChosen(); }));
         };
+
+        b.box.addEventListener('scroll', () => {
+            if (b.box.scrollHeight - b.box.scrollTop - b.box.clientHeight < 40) { b.seen = b.msgs.length; if (jump) jump.hidden = true; }
+        });
+        if (jump) jump.addEventListener('click', () => { b.forceEnd = true; render(b); });
+
         picker.addEventListener('change', () => {
             const tooBig = [...picker.files].filter((f) => f.size > 10 * 1024 * 1024);
             chosen = [...chosen, ...[...picker.files].filter((f) => f.size <= 10 * 1024 * 1024)].slice(0, 5);
             picker.value = '';
             showChosen();
-            if (tooBig.length) shelf.insertAdjacentHTML('beforeend', `<span class="send-err">${esc(tooBig.map((f) => f.name).join(', '))}: more than 10 MB, not attached.</span>`);
+            showError(tooBig.length ? `${tooBig.map((f) => f.name).join(', ')}: more than 10 MB, not attached.` : '');
         });
 
-        text.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
-        });
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        const send = async () => {
+            if (sending) return;
             const body = text.value.trim();
-            if (!body && !chosen.length) return;
+            if (!body && !chosen.length) { text.focus(); return; }
+            sending = true;
             button.disabled = true;
-            form.querySelector('.send-err')?.remove();
+            form.classList.add('is-sending');
+            showError('');
             try {
                 const payload = new FormData();
                 payload.append('channel', b.channel);
@@ -175,23 +222,42 @@ if (dataEl) {
                     method: 'POST',
                     headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
                     body: payload,
+                    credentials: 'same-origin',
                 });
+                if (res.status === 419) throw new Error('Your session expired. Reload the page (your text is still here: copy it first).');
+                if (res.status === 401) throw new Error('You were signed out. Sign in again.');
+                if (res.status === 429) throw new Error('Too many messages in a minute. Wait a moment and press Enter again.');
                 if (!res.ok) {
-                    const reason = res.status === 422 ? ((await res.json()).message || '') : '';
-                    throw new Error(reason);
+                    let reason = '';
+                    try { reason = (await res.json()).message || ''; } catch (e) { /* not JSON */ }
+                    throw new Error(reason || `The office answered with an error (${res.status}).`);
                 }
                 // Cleared only once the server has saved it.
                 text.value = '';
+                grow();
                 chosen = [];
                 showChosen();
                 b.forceEnd = true;
                 await poll();
             } catch (err) {
-                form.insertAdjacentHTML('beforeend', `<span class="send-err">Not sent${err.message ? ': ' + esc(err.message) : ''}. Your text and files are still here; try again.</span>`);
+                showError(`Not sent. ${err.message || 'Check your connection and press Enter again.'}`);
             } finally {
+                sending = false;
                 button.disabled = false;
+                form.classList.remove('is-sending');
+                text.focus();
+            }
+        };
+
+        // Enter sends; Shift+Enter makes a new line. Composing text (IME) is left alone.
+        text.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+                e.preventDefault();
+                send();
             }
         });
+        text.addEventListener('input', grow);
+        form.addEventListener('submit', (e) => { e.preventDefault(); send(); });
     });
 
     document.querySelectorAll('[data-big]').forEach((btn) => btn.addEventListener('click', () => {
