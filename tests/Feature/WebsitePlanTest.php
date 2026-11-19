@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\PlanPage;
+use App\Models\Setting;
 use App\Models\User;
+use App\Office\Erp\ErpClient;
 use App\Office\Team;
 use App\Office\Tools\AgentTool;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,6 +26,20 @@ class WebsitePlanTest extends TestCase
     {
         $this->assertTrue($this->itTools()->has('office_plan_save'));
         $this->assertFalse(collect(app(Team::class)->toolsFor('limo'))->contains('name', 'office_plan_save'));
+    }
+
+    public function test_the_it_manager_plans_from_real_information_the_erp_and_the_web_with_sources(): void
+    {
+        Setting::write(ErpClient::URL, 'https://erp.test');
+        Setting::write(ErpClient::KEY, 'office_x');
+        Setting::write(ErpClient::WORKSPACES, '1');
+        $team = app(Team::class);
+
+        $names = array_map(fn ($tool) => $tool->name, $team->toolsFor('it'));
+        $this->assertContains('erp_limousine_trips', $names);
+        $this->assertNotContains('erp_journal_entries', $names);
+        $this->assertTrue($team->searchesWeb('it'));
+        $this->assertStringContainsString('"To confirm"', $team->get('it')['brief']);
     }
 
     public function test_the_it_manager_adds_and_changes_pages_and_a_changed_approved_page_needs_approval_again(): void
