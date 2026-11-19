@@ -1,0 +1,90 @@
+<?php
+
+namespace App\Office;
+
+use App\Models\Fact;
+use App\Models\Message;
+
+/**
+ * What an agent is told before it answers: who it is, the office's rules, what data it
+ * really has, the confirmed facts, and the conversation so far.
+ */
+class Instructions
+{
+    public function __construct(private Team $team) {}
+
+    public function for(string $agent, string $channel): string
+    {
+        $profile = $this->team->get($agent);
+        $name = $this->team->nameOf($agent);
+
+        $lines = [
+            'You work in the Wanaan AI office. Wanaan is a business in Bahrain with a Rent A Car section, a Limousine section, a shop and accounting, run on its own ERP.',
+            '',
+            'You are the '.$profile['title'].($name !== null ? ', named '.$name : '').'. '.$profile['brief'],
+            '',
+            'Office rules:',
+            '- The owner decides. You recommend; you never approve payments, change records or publish anything yourself.',
+            '- Write plainly and briefly, in the language the owner wrote in (English or Arabic).',
+            '- Say what you do not know. Never invent numbers, names, dates or records.',
+            '- When you need information only the owner can give, ask one clear question.',
+        ];
+
+        if ($this->team->hasData($agent)) {
+            $lines[] = '- You can see: '.implode(', ', $profile['data']).'. Use only what is in front of you.';
+        } else {
+            $lines[] = '- You are not connected to any company data yet. You can talk, plan and give general advice, but say plainly that you cannot see the real records, and never present a figure as Wanaan\'s own.';
+        }
+
+        $lines[] = $channel === Message::EVERYONE
+            ? '- This is the Everyone chat: the whole team reads it. Answer only what is yours to answer.'
+            : '- This is a private chat with the owner. Do not repeat it in the Everyone chat.';
+
+        $facts = Fact::orderBy('id')->get()
+            ->filter(fn (Fact $fact): bool => $fact->agents === null || $fact->agents === [] || in_array($agent, $fact->agents, true));
+
+        $lines[] = '';
+        $lines[] = 'Facts the owner has confirmed (true, never ask about them again):';
+        if ($facts->isEmpty()) {
+            $lines[] = '- None yet.';
+        }
+        foreach ($facts as $fact) {
+            $lines[] = '- '.$fact->text;
+        }
+
+        $lines[] = '';
+        $lines[] = 'Today is '.now()->format('l j F Y').'.';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * The conversation as the agent sees it: its own messages as its turns, everyone
+     * else's as the other side, each labelled with who wrote it.
+     *
+     * @return list<array{role: 'user'|'assistant', content: string}>
+     */
+    public function conversation(string $agent, string $channel, ?int $ownerId): array
+    {
+        $messages = Message::with('user')->where('channel', $channel)
+            ->when($ownerId === null, fn ($query) => $query->whereNull('owner_id'), fn ($query) => $query->where('owner_id', $ownerId))
+            ->orderByDesc('id')->limit(config('office.history'))->get()->reverse()->values();
+
+        $turns = [];
+        foreach ($messages as $message) {
+            $mine = $message->agent === $agent;
+            $author = $message->isFromAgent() ? $this->team->label($message->agent) : ($message->user?->name ?? 'Someone');
+            $turns[] = [
+                'role' => $mine ? 'assistant' : 'user',
+                'content' => $mine ? $message->body : "[{$author}] {$message->body}",
+            ];
+        }
+
+        // The conversation must open with the other side.
+        while ($turns !== [] && $turns[0]['role'] === 'assistant') {
+            array_shift($turns);
+        }
+
+        return $turns;
+    }
+}
