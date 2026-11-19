@@ -123,6 +123,7 @@ class Instructions
         if (! in_array('erp', $sources, true) && ! in_array('seo', $sources, true)) {
             $lines[] = 'You cannot see Wanaan\'s company records (the ERP). Say so plainly when it matters, and never present a figure as Wanaan\'s own.';
         }
+        $lines[] = 'When something is a colleague\'s job (their data, their research), ask them with office_ask_colleague instead of guessing.';
         $lines[] = 'If your work depends on something only the owner can answer, put it on the Questions page with office_ask_owner (at most '.Question::OPEN_PER_AGENT.' open).';
         if (($profile['manager'] ?? false) || $agent === 'it') {
             $lines[] = 'When the data or the system is not good enough for your work, push IT for the improvement with office_request_it. It waits on the IT board until the owner approves it. Never file again what the owner already approved, put off or saw done.';

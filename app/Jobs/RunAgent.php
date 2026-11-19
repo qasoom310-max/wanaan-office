@@ -10,6 +10,7 @@ use App\Office\AgentProblem;
 use App\Office\Instructions;
 use App\Office\Spending;
 use App\Office\Team;
+use App\Office\Tools\ColleagueTool;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -93,7 +94,9 @@ class RunAgent implements ShouldQueue
             if ($team->searchesWeb($run->agent)) {
                 $limits['web_search'] = true;
             }
-            $reply = $model->reply($system, $conversation, $team->toolsFor($run->agent, $run->channel, $run->owner_id), function (string $label) use ($run, &$step, &$total): void {
+            // Every agent may also ask a colleague (who answers alone: no chains).
+            $tools = [...$team->toolsFor($run->agent, $run->channel, $run->owner_id), app(ColleagueTool::class)->for($run->agent, $run->channel, $run->owner_id)];
+            $reply = $model->reply($system, $conversation, $tools, function (string $label) use ($run, &$step, &$total): void {
                 // Each tool the agent uses is a real step on its desk.
                 $step = min($step + 1, 250);
                 $total = max($total, $step + 1);
