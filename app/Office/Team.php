@@ -126,6 +126,9 @@ class Team
         if (($this->get($agent)['manager'] ?? false) || $agent === 'it') {
             $tools[] = $office->requestIt($agent);
         }
+        if ($this->get($agent)['manager'] ?? false) {
+            $tools[] = $office->monthlyReport($agent);
+        }
 
         return $tools;
     }

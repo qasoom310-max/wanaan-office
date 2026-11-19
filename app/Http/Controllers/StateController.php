@@ -75,7 +75,7 @@ class StateController extends Controller
         return [
             'id' => $message->id,
             'mine' => ! $message->isFromAgent(),
-            'author' => $message->isFromAgent() ? $team->label($message->agent) : ($message->user?->name ?? 'Someone'),
+            'author' => $message->isFromAgent() ? $team->label($message->agent) : ($message->user_id === null ? 'Office (automatic)' : ($message->user?->name ?? 'Someone')),
             'body' => $message->body,
             'at' => $message->created_at->toIso8601String(),
             'files' => $message->files->map(fn (MessageFile $file): array => [

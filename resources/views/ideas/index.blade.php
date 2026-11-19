@@ -1,32 +1,59 @@
 @extends('layouts.app', ['title' => 'IT board · Wanaan Office'])
 
 @section('content')
-    <p class="muted" style="margin:0;max-width:70ch">Improvements the team asks IT for. Nothing is built until the owner approves it.</p>
+    <p class="muted" style="margin:0;max-width:75ch">Improvements the team asks IT for. Nothing is built until you approve it. Once you approve, the IT Manager writes the requirement; then copy it into Claude Code to build it.</p>
 
-    <div class="list">
-        @foreach ($ideas as $idea)
-            <div class="row {{ $idea->status }}">
-                <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between">
-                    <b>{{ $idea->title }}</b>
-                    <span class="chip {{ $idea->status === 'wait' ? 'w' : '' }}">{{ \App\Models\Idea::STATUSES[$idea->status] }}</span>
-                </div>
-                <div class="muted">{{ $idea->why }}</div>
-                <div class="meta">
-                    <span>Asked by {{ $team->exists($idea->agent) ? $team->label($idea->agent) : $idea->agent }}</span>
-                    <span>Size: {{ $idea->size }}</span>
-                    @if ($idea->note)<span>{{ $idea->note }}</span>@endif
-                </div>
-                @can('owner')
-                    @if (in_array($idea->status, ['wait', 'later'], true))
-                        <div class="inline-form">
-                            <form method="POST" action="{{ route('ideas.decide', $idea) }}">@csrf<input type="hidden" name="status" value="yes"><button class="btn" type="submit">Approve</button></form>
-                            @if ($idea->status === 'wait')
-                                <form method="POST" action="{{ route('ideas.decide', $idea) }}">@csrf<input type="hidden" name="status" value="later"><button class="btn ghost" type="submit">Not now</button></form>
-                            @endif
+    @foreach ($sections as $status => $section)
+        @if ($section['ideas']->isNotEmpty())
+            <h2 class="board-h">{{ $section['label'] }} <span class="muted">· {{ $section['ideas']->count() }}</span></h2>
+            <div class="list">
+                @foreach ($section['ideas'] as $idea)
+                    <div class="row {{ $status === 'wait' ? 'wait' : ($status === 'done' ? 'done' : '') }}">
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between">
+                            <b>{{ $idea->title }}</b>
+                            <span class="chip {{ $status === 'wait' ? 'w' : '' }}">{{ $section['label'] }}</span>
                         </div>
-                    @endif
-                @endcan
+                        <div class="muted">{{ $idea->why }}</div>
+                        <div class="meta">
+                            <span>Asked by {{ $team->exists($idea->agent) ? $team->label($idea->agent) : $idea->agent }}</span>
+                            <span>Size: {{ $idea->size }}</span>
+                            @if ($idea->note)<span>{{ $idea->note }}</span>@endif
+                        </div>
+
+                        @if ($status === 'yes' && ! $idea->note)
+                            <div class="muted"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span> The IT Manager is writing the requirement…</div>
+                        @endif
+
+                        @if ($idea->requirement)
+                            <details @if($status === 'ready') open @endif>
+                                <summary><b>Requirement</b> <span class="muted">written by the IT Manager</span></summary>
+                                <div class="requirement">{!! \Illuminate\Support\Str::markdown($idea->requirement, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}</div>
+                            </details>
+                        @endif
+
+                        @can('owner')
+                            <div class="inline-form">
+                                @if (in_array($status, ['wait', 'later'], true))
+                                    <form method="POST" action="{{ route('ideas.decide', $idea) }}">@csrf<input type="hidden" name="status" value="yes"><button class="btn" type="submit">Approve</button></form>
+                                @endif
+                                @if ($status === 'wait')
+                                    <form method="POST" action="{{ route('ideas.decide', $idea) }}">@csrf<input type="hidden" name="status" value="later"><button class="btn ghost" type="submit">Not now</button></form>
+                                @endif
+                                @if ($status === 'ready')
+                                    <button class="btn" type="button" data-copy="{{ $idea->forClaudeCode() }}">Copy for Claude Code</button>
+                                    <form method="POST" action="{{ route('ideas.decide', $idea) }}">@csrf<input type="hidden" name="status" value="building"><button class="btn ghost" type="submit">Being built</button></form>
+                                @endif
+                                @if (in_array($status, ['ready', 'building'], true))
+                                    <form method="POST" action="{{ route('ideas.decide', $idea) }}">@csrf<input type="hidden" name="status" value="done"><button class="btn ghost" type="submit">Mark done</button></form>
+                                @endif
+                                @if (in_array($status, ['yes', 'ready'], true))
+                                    <form method="POST" action="{{ route('ideas.decide', $idea) }}">@csrf<input type="hidden" name="status" value="rewrite"><button class="btn ghost" type="submit">Write it again</button></form>
+                                @endif
+                            </div>
+                        @endcan
+                    </div>
+                @endforeach
             </div>
-        @endforeach
-    </div>
+        @endif
+    @endforeach
 @endsection

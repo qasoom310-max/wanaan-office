@@ -7,6 +7,7 @@ use App\Models\Fact;
 use App\Models\Idea;
 use App\Models\Message;
 use App\Models\MessageFile;
+use App\Models\MonthlyReport;
 use App\Models\PlanPage;
 use App\Models\Question;
 use App\Office\Spending;
@@ -64,6 +65,34 @@ class OfficeTools
                     ]);
                 }),
         ];
+    }
+
+    /**
+     * A manager writes (or revises) its improvement report for the month: one per month.
+     */
+    public function monthlyReport(string $agent): AgentTool
+    {
+        return new AgentTool('office_monthly_report', 'Save your improvement report for a month (this month, or last month when it has just ended). One report per month: saving again replaces it. Write it in Markdown with headings: Summary · What went well (with numbers) · What is wrong (with numbers and examples) · What I will improve next month · What I need from the owner · What I need from IT · Risks. Base every figure on the real data you read, name the period, and keep assumptions in a "To confirm" list.',
+            ['type' => 'object', 'properties' => [
+                'month' => ['type' => 'string', 'description' => 'YYYY-MM: this month or last month.'],
+                'title' => ['type' => 'string', 'description' => 'e.g. "Limousine: improvement report, October 2026".'],
+                'report' => ['type' => 'string', 'description' => 'The whole report in Markdown.'],
+            ], 'required' => ['month', 'title', 'report']],
+            fn (): string => 'Saving the monthly improvement report',
+            function (array $in) use ($agent): string {
+                $month = (string) ($in['month'] ?? '');
+                $allowed = [now()->format('Y-m'), now()->subMonthNoOverflow()->format('Y-m')];
+                if (! in_array($month, $allowed, true)) {
+                    return 'Not saved: the month must be '.implode(' or ', $allowed).'.';
+                }
+                $body = trim((string) ($in['report'] ?? ''));
+                if (mb_strlen($body) < 200) {
+                    return 'Not saved: a monthly report must be a full report, not a note.';
+                }
+                $report = MonthlyReport::updateOrCreate(['agent' => $agent, 'month' => $month], ['title' => mb_substr(trim((string) $in['title']), 0, 200), 'body' => mb_substr($body, 0, 200000)]);
+
+                return 'Saved as "'.$report->title.'" on the Monthly reports page.';
+            });
     }
 
     /**
@@ -240,7 +269,8 @@ class OfficeTools
                     }
 
                     return match ($earlier->status) {
-                        'yes' => 'Not filed: the owner already approved this ("'.$earlier->title.'"). It is waiting to be built; do not ask again.',
+                        'yes', 'ready' => 'Not filed: the owner already approved this ("'.$earlier->title.'"). It is waiting to be built; do not ask again.',
+                        'building' => 'Not filed: the owner already approved this and it is being built ("'.$earlier->title.'").',
                         'done' => 'Not filed: this is already done ("'.$earlier->title.'").',
                         'later' => 'Not filed: the owner put this off ("'.$earlier->title.'"). Do not ask again unless something important has changed; if it has, say what in the chat instead.',
                         default => 'Not filed: it is already on the IT board, waiting for the owner ("'.$earlier->title.'").',

@@ -8,16 +8,32 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * A request to IT. Nothing is built until the owner approves it.
  */
-#[Fillable(['agent', 'title', 'why', 'size', 'status', 'note', 'decided_by', 'decided_at'])]
+#[Fillable(['agent', 'title', 'why', 'size', 'status', 'note', 'decided_by', 'decided_at', 'requirement', 'done_at'])]
 class Idea extends Model
 {
-    public const STATUSES = ['wait' => 'Waiting for you', 'yes' => 'Approved', 'later' => 'Later', 'done' => 'Done'];
+    /** The board's sections, in the order they are shown. */
+    public const STATUSES = [
+        'wait' => 'Waiting for you',
+        'yes' => 'Writing the requirement',
+        'ready' => 'Ready to build',
+        'building' => 'Being built',
+        'done' => 'Done',
+        'later' => 'Not now',
+    ];
 
     /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
-        return ['decided_at' => 'datetime'];
+        return ['decided_at' => 'datetime', 'done_at' => 'datetime'];
+    }
+
+    /** What to paste into Claude Code to build it. */
+    public function forClaudeCode(): string
+    {
+        return "Build this for Wanaan (approved by the owner on the AI office's IT board).\n\n"
+            ."Request: {$this->title}\nWhy: {$this->why}\nSize: {$this->size}\n\n"
+            ."Requirement written by the IT Manager:\n".($this->requirement ?? '(not written yet)');
     }
 }

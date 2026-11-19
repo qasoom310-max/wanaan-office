@@ -23,6 +23,7 @@
                 <a href="{{ route('ideas') }}" @if(request()->routeIs('ideas')) aria-current="page" @endif>IT board @if($waitingIdeas)<span class="n">{{ $waitingIdeas }}</span>@endif</a>
                 @php $planWaiting = \App\Models\PlanPage::where('status', 'planned')->count(); @endphp
                 <a href="{{ route('plan') }}" @if(request()->routeIs('plan')) aria-current="page" @endif>Website plan @if($planWaiting)<span class="n">{{ $planWaiting }}</span>@endif</a>
+                <a href="{{ route('reports') }}" @if(request()->routeIs('reports*')) aria-current="page" @endif>Monthly reports</a>
                 @can('owner')
                     <a href="{{ route('settings') }}" @if(request()->routeIs('settings')) aria-current="page" @endif>Settings</a>
                 @endcan

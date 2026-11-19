@@ -9,6 +9,7 @@ use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\PasswordController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QuestionController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StateController;
 use App\Http\Middleware\EnsurePasswordChanged;
@@ -35,6 +36,9 @@ Route::middleware(['auth', EnsurePasswordChanged::class])->group(function () {
     Route::get('questions', [QuestionController::class, 'index'])->name('questions');
     Route::get('it', [IdeaController::class, 'index'])->name('ideas');
     Route::get('website-plan', [PlanController::class, 'index'])->name('plan');
+    Route::get('reports', [ReportController::class, 'index'])->name('reports');
+    Route::get('reports/{report}', [ReportController::class, 'show'])->name('reports.show');
+    Route::get('reports/{report}/download', [ReportController::class, 'download'])->name('reports.download');
 
     Route::middleware('can:owner')->group(function () {
         Route::post('office/names', [NameController::class, 'store'])->name('names.store');

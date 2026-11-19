@@ -74,7 +74,7 @@ class Instructions
 
         $turns = [];
         foreach ($messages as $index => $message) {
-            $author = $message->isFromAgent() ? $this->team->label($message->agent) : ($message->user?->name ?? 'Someone').' (owner)';
+            $author = $message->isFromAgent() ? $this->team->label($message->agent) : ($message->user_id === null ? 'Office (automatic)' : ($message->user?->name ?? 'Someone').' (owner)');
             $content = [['type' => 'text', 'text' => "[{$author}] {$message->body}"]];
             foreach ($message->files as $file) {
                 if ($index >= $showFrom) {
