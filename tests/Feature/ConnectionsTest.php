@@ -50,7 +50,9 @@ class ConnectionsTest extends TestCase
         Http::fake(['seo.test/api/office/v1/projects' => Http::response(['data' => [['id' => 1, 'name' => 'Wanaan Rental Car']]])]);
 
         foreach (['mkt', 'res', 'txt', 'pic', 'vid'] as $agent) {
-            $this->assertContains('seo_campaigns', $this->toolNames($agent), $agent);
+            foreach (['seo_campaigns', 'seo_pages', 'seo_links', 'seo_history', 'seo_recommendations'] as $tool) {
+                $this->assertContains($tool, $this->toolNames($agent), "{$agent}: {$tool}");
+            }
         }
         $this->assertNotContains('seo_campaigns', $this->toolNames('acc'));
 
