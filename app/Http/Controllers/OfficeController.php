@@ -38,6 +38,7 @@ class OfficeController extends Controller
             'direct' => $direct,
             'chats' => $chats,
             'history' => $history,
+            'reads' => StateController::reads($team),
             'openQuestions' => Question::whereNull('answered_at')->get()->countBy('agent')->all(),
         ]);
     }

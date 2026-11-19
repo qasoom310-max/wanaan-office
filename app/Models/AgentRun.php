@@ -14,9 +14,12 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $heartbeat_at
  * @property Carbon|null $finished_at
  */
-#[Fillable(['agent', 'channel', 'owner_id', 'message_id', 'status', 'step', 'step_number', 'step_total', 'error', 'claimed_at', 'heartbeat_at', 'finished_at', 'input_tokens', 'output_tokens'])]
+#[Fillable(['agent', 'channel', 'owner_id', 'message_id', 'status', 'step', 'step_number', 'step_total', 'error', 'claimed_at', 'heartbeat_at', 'finished_at', 'input_tokens', 'output_tokens', 'meeting'])]
 class AgentRun extends Model
 {
+    /** In a team meeting, queued behind the agents before it. */
+    public const WAITING = 'waiting';
+
     public const WORKING = 'working';
 
     public const DONE = 'done';
@@ -28,7 +31,7 @@ class AgentRun extends Model
      */
     protected function casts(): array
     {
-        return ['claimed_at' => 'datetime', 'heartbeat_at' => 'datetime', 'finished_at' => 'datetime'];
+        return ['meeting' => 'boolean', 'claimed_at' => 'datetime', 'heartbeat_at' => 'datetime', 'finished_at' => 'datetime'];
     }
 
     public function moveTo(string $step, int $number, int $total): void

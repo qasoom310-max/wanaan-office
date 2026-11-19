@@ -55,7 +55,7 @@
             <section class="chat" data-channel="{{ $channel }}">
                 <div class="chat-h">
                     <b>{{ $channels->title($channel) }}</b>
-                    <span class="tag">{{ $private ? 'Private · only you' : 'Everyone hears · the right one answers' }}</span>
+                    <span class="tag">{{ $private ? 'Private · only you' : 'Team meeting · everyone reads, answers or argues · @Name asks one' }}</span>
                     <span class="tools">
                         <span class="count" data-count></span>
                         <button class="btn ghost sm" type="button" data-big>Bigger</button>
@@ -67,7 +67,7 @@
                 <div class="msgs" data-msgs aria-live="polite"></div>
                 <form class="compose" data-compose>
                     <textarea class="field" rows="2" maxlength="8000" required
-                              placeholder="{{ $channel === \App\Models\Message::EVERYONE ? 'Write to the whole team… (@name to ask one agent)' : 'Write to '.$team->displayName($channel === 'secretary' ? 'sec' : substr($channel, 7)).'… (Enter sends, Shift+Enter new line)' }}"></textarea>
+                              placeholder="{{ $channel === \App\Models\Message::EVERYONE ? 'Give the team an instruction… everyone reads it (@Name to ask just one)' : 'Write to '.$team->displayName($channel === 'secretary' ? 'sec' : substr($channel, 7)).'… (Enter sends, Shift+Enter new line)' }}"></textarea>
                     <button class="btn" type="submit">Send</button>
                 </form>
             </section>
@@ -75,7 +75,7 @@
     </div>
 
     @php
-        $officeData = ['history' => $history, 'stateUrl' => route('office.state'), 'chatUrl' => route('office.chat')];
+        $officeData = ['history' => $history, 'reads' => $reads, 'stateUrl' => route('office.state'), 'chatUrl' => route('office.chat')];
     @endphp
     <script type="application/json" id="office-data">{!! json_encode($officeData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
 @endsection

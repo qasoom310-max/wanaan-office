@@ -2,6 +2,7 @@
 
 namespace App\Office;
 
+use App\Jobs\RunAgent;
 use App\Models\Fact;
 use App\Models\Message;
 
@@ -13,7 +14,7 @@ class Instructions
 {
     public function __construct(private Team $team) {}
 
-    public function for(string $agent, string $channel): string
+    public function for(string $agent, string $channel, bool $meeting = false): string
     {
         $profile = $this->team->get($agent);
         $name = $this->team->nameOf($agent);
@@ -28,6 +29,7 @@ class Instructions
             '- Write plainly and briefly, in the language the owner wrote in (English or Arabic).',
             '- Say what you do not know. Never invent numbers, names, dates or records.',
             '- When you need information only the owner can give, ask one clear question.',
+            '- When the owner decides something you think is wrong or risky for your area, say so plainly: what worries you, why, and what you would do instead. Speaking up is part of your job; once the owner has heard you, the owner decides.',
         ];
 
         if ($this->team->hasData($agent)) {
@@ -36,9 +38,19 @@ class Instructions
             $lines[] = '- You are not connected to any company data yet. You can talk, plan and give general advice, but say plainly that you cannot see the real records, and never present a figure as Wanaan\'s own.';
         }
 
-        $lines[] = $channel === Message::EVERYONE
-            ? '- This is the Everyone chat: the whole team reads it. Answer only what is yours to answer.'
-            : '- This is a private chat with the owner. Do not repeat it in the Everyone chat.';
+        if ($meeting) {
+            array_push($lines,
+                '',
+                'This is a team meeting in the Everyone chat. The owner\'s last message is for the whole team, and every agent takes a turn, in order.',
+                '- Read it as it touches YOUR job. If it does: say in a few sentences what you will do about it, or, if you disagree, argue your case with reasons.',
+                '- You may agree or disagree with colleagues who spoke before you. Do not repeat what they already said.',
+                '- If it does not touch your job and you have nothing important to add, reply with exactly: '.RunAgent::READ_ONLY_REPLY,
+            );
+        } else {
+            $lines[] = $channel === Message::EVERYONE
+                ? '- This is the Everyone chat: the whole team reads it. The owner asked you by name.'
+                : '- This is a private chat with the owner. Do not repeat it in the Everyone chat.';
+        }
 
         $facts = Fact::orderBy('id')->get()
             ->filter(fn (Fact $fact): bool => $fact->agents === null || $fact->agents === [] || in_array($agent, $fact->agents, true));

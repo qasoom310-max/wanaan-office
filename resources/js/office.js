@@ -8,6 +8,7 @@ if (dataEl) {
     const data = JSON.parse(dataEl.textContent);
     const csrf = document.querySelector('meta[name="csrf-token"]').content;
     const chats = {};
+    let reads = data.reads || {};
 
     const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     const when = (iso) => {
@@ -28,7 +29,12 @@ if (dataEl) {
         const c = chats[channel];
         const atEnd = c.box.scrollHeight - c.box.scrollTop - c.box.clientHeight < 40;
         const priv = channel !== 'everyone';
-        const html = c.msgs.map((m) => `<div class="m ${m.mine ? 'u' : 'a'}">${priv && !m.mine ? '' : `<span class="who">${esc(m.author)}</span>`}${esc(m.body)}<span class="t">${esc(when(m.at))}</span></div>`).join('')
+        const receipt = (m) => {
+            const names = !priv && m.mine ? (reads[m.id] || []) : [];
+            return names.length ? `<span class="t" title="${esc(names.join(', '))}">Read by ${names.length} · ${esc(names.slice(0, 4).join(', '))}${names.length > 4 ? '…' : ''}</span>` : '';
+        };
+        const html = c.msgs.map((m) => `<div class="m ${m.mine ? 'u' : 'a'}">${priv && !m.mine ? '' : `<span class="who">${esc(m.author)}</span>`}${esc(m.body)}<span class="t">${esc(when(m.at))}</span>${receipt(m)}</div>`).join('')
+            + (c.waiting ? `<div class="m a typing"><span>${c.waiting} more waiting for their turn</span></div>` : '')
             + c.typing.map((r) => `<div class="m a typing ${r.stuck ? 'stuck' : ''}"><span class="who">${esc(r.name)}</span>${r.stuck ? '' : '<span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>'}<span>${esc(r.stuck ? `Stuck on: ${r.step || 'working'} (${Math.round(r.seconds / 60)} min)` : (r.step || 'Working') + '…')}</span></div>`).join('');
         c.box.innerHTML = html || '<div class="empty">No messages yet. Write the first one.</div>';
         const mine = c.msgs.filter((m) => m.mine).length;
@@ -39,18 +45,21 @@ if (dataEl) {
     function renderRuns(runs) {
         document.querySelectorAll('[data-desk]').forEach((desk) => {
             const run = runs.filter((r) => r.agent === desk.dataset.desk).at(-1);
-            desk.classList.toggle('working', !!run && !run.stuck);
+            desk.classList.toggle('working', !!run && !run.stuck && !run.waiting);
             desk.classList.toggle('stuck', !!run && run.stuck);
-            desk.querySelector('[data-step]').textContent = run ? (run.stuck ? `Stuck on: ${run.step || 'working'}` : `${run.step || 'Working'}…`) : 'Ready';
+            desk.querySelector('[data-step]').textContent = run ? (run.stuck ? `Stuck on: ${run.step || 'working'}` : run.waiting ? 'Waiting for their turn' : `${run.step || 'Working'}…`) : 'Ready';
         });
 
         const now = document.getElementById('now');
+        const active = runs.filter((r) => !r.waiting);
+        const waiting = runs.length - active.length;
         now.innerHTML = runs.length
-            ? '<span class="now-l live">Right now</span>' + runs.map((r) => `<span class="now-i ${r.stuck ? 'stuck' : ''}"><b>${esc(r.name)}</b> ${esc((r.step || 'working').toLowerCase())} <span class="bar"><span style="width:${Math.round((r.step_number / Math.max(r.step_total, 1)) * 100)}%"></span></span></span>`).join('')
+            ? '<span class="now-l live">Right now</span>' + (waiting ? `<span class="now-i">${waiting} waiting for their turn</span>` : '') + active.map((r) => `<span class="now-i ${r.stuck ? 'stuck' : ''}"><b>${esc(r.name)}</b> ${esc((r.step || 'working').toLowerCase())} <span class="bar"><span style="width:${Math.round((r.step_number / Math.max(r.step_total, 1)) * 100)}%"></span></span></span>`).join('')
             : '<span class="now-l">Right now</span><span>Nobody is working.</span>';
 
         Object.entries(chats).forEach(([channel, c]) => {
-            c.typing = runs.filter((r) => r.channel === channel);
+            c.typing = runs.filter((r) => r.channel === channel && !r.waiting);
+            c.waiting = runs.filter((r) => r.channel === channel && r.waiting).length;
             renderChat(channel);
         });
     }
@@ -71,6 +80,7 @@ if (dataEl) {
                 const known = new Set(c.msgs.map((m) => m.id));
                 c.msgs.push(...msgs.filter((m) => !known.has(m.id)));
             });
+            reads = state.reads || reads;
             renderRuns(state.runs);
         } catch (e) {
             /* The next poll tries again; nothing on the page is lost. */

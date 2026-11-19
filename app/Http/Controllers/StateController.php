@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AgentRun;
 use App\Models\Message;
+use App\Models\MessageRead;
 use App\Office\Channels;
 use App\Office\Team;
 use Illuminate\Http\JsonResponse;
@@ -31,7 +32,7 @@ class StateController extends Controller
         }
 
         // Only runs this person may see: the shared chat's, and their own private ones.
-        $runs = AgentRun::where('status', AgentRun::WORKING)
+        $runs = AgentRun::whereIn('status', [AgentRun::WAITING, AgentRun::WORKING])
             ->where(fn ($query) => $query->whereNull('owner_id')->orWhere('owner_id', $user->id))
             ->orderBy('id')->get()
             ->map(fn (AgentRun $run): array => [
@@ -40,13 +41,29 @@ class StateController extends Controller
                 'name' => $team->displayName($run->agent),
                 'channel' => $run->channel,
                 'step' => $run->step,
+                'waiting' => $run->status === AgentRun::WAITING,
                 'step_number' => $run->step_number,
                 'step_total' => $run->step_total,
                 'stuck' => $run->isStuck(),
                 'seconds' => (int) $run->created_at->diffInSeconds(now()),
             ])->all();
 
-        return response()->json(['messages' => $messages, 'runs' => $runs]);
+        return response()->json(['messages' => $messages, 'runs' => $runs, 'reads' => self::reads($team)]);
+    }
+
+    /**
+     * Who has read the owner's recent messages in the Everyone chat.
+     *
+     * @return array<int, list<string>>
+     */
+    public static function reads(Team $team): array
+    {
+        $ids = Message::where('channel', Message::EVERYONE)->whereNull('agent')->orderByDesc('id')->limit(30)->pluck('id');
+
+        return MessageRead::whereIn('message_id', $ids)->orderBy('id')->get()
+            ->groupBy('message_id')
+            ->map(fn ($reads): array => $reads->map(fn (MessageRead $read): string => $team->displayName($read->agent))->values()->all())
+            ->all();
     }
 
     /**

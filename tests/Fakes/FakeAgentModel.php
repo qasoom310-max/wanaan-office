@@ -17,6 +17,12 @@ class FakeAgentModel implements AgentModel
 
     public int $calls = 0;
 
+    /** @var (callable(string, list<array{role: string, content: string}>): string)|null Picks the answer from what the agent was told. */
+    public $answerWith = null;
+
+    /** @var list<list<array{role: string, content: string}>> Every conversation sent, in order. */
+    public array $conversations = [];
+
     public function __construct(public bool $configured = true, public ?string $problem = null, public string $answer = 'Noted.') {}
 
     public function isConfigured(): bool
@@ -29,11 +35,14 @@ class FakeAgentModel implements AgentModel
         $this->calls++;
         $this->lastInstructions = $instructions;
         $this->lastMessages = $messages;
+        $this->conversations[] = $messages;
 
         if ($this->problem !== null) {
             throw new AgentProblem($this->problem);
         }
 
-        return ['text' => $this->answer, 'input_tokens' => 120, 'output_tokens' => 8];
+        $text = $this->answerWith !== null ? ($this->answerWith)($instructions, $messages) : $this->answer;
+
+        return ['text' => $text, 'input_tokens' => 120, 'output_tokens' => 8];
     }
 }
