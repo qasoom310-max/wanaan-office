@@ -8,12 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * A request to IT. Nothing is built until the owner approves it.
  */
-#[Fillable(['agent', 'title', 'why', 'size', 'status', 'note', 'decided_by', 'decided_at', 'requirement', 'done_at'])]
+#[Fillable(['agent', 'title', 'why', 'size', 'status', 'note', 'decided_by', 'decided_at', 'requirement', 'done_at', 'owner_reason'])]
 class Idea extends Model
 {
     /** The board's sections, in the order they are shown. */
     public const STATUSES = [
         'wait' => 'Waiting for you',
+        'rethink' => 'Sent back to rethink',
         'yes' => 'Writing the requirement',
         'ready' => 'Ready to build',
         'building' => 'Being built',

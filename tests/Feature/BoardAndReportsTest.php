@@ -51,6 +51,41 @@ class BoardAndReportsTest extends TestCase
         $this->assertTrue(Fact::where('text', 'like', 'Done on the IT board: Record the destination%')->exists());
     }
 
+    public function test_reconsider_sends_the_reason_to_the_agent_who_asked_and_a_changed_request_replaces_it(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $idea = Idea::create(['agent' => 'limo', 'title' => 'GPS tracker in every car', 'why' => 'Real route costs.', 'size' => 'Large']);
+        $this->model->answer = 'Understood. A cheaper way: the driver picks the route from a list.';
+
+        $this->actingAs($owner)->post(route('ideas.reconsider', $idea), ['reason' => ''])->assertSessionHasErrors('reason');
+        $this->actingAs($owner)->post(route('ideas.reconsider', $idea), ['reason' => 'Trackers cost too much for 12 cars this year.'])->assertSessionHas('status');
+
+        $idea->refresh();
+        $this->assertSame('rethink', $idea->status);
+        $this->assertSame('Trackers cost too much for 12 cars this year.', $idea->owner_reason);
+
+        // The reason and the answer are in the private chat with the Limousine Manager, for good.
+        $sent = Message::where('channel', 'direct:limo')->whereNotNull('user_id')->sole();
+        $this->assertStringContainsString('Trackers cost too much', $sent->body);
+        $this->assertTrue(Message::where('channel', 'direct:limo')->where('agent', 'limo')->where('body', 'like', 'Understood.%')->exists());
+
+        $this->actingAs($owner)->get(route('ideas'))->assertOk()->assertSee('Sent back to rethink')->assertSee('Trackers cost too much');
+
+        // Another agent cannot file it again as it is; they are told why.
+        $tool = fn (string $agent) => collect(app(Team::class)->toolsFor($agent))->firstWhere('name', 'office_request_it');
+        $this->assertStringContainsString('Trackers cost too much', ($tool('dev')->run)(['title' => 'GPS tracker in every car', 'why' => 'Real route costs.', 'size' => 'Large']));
+
+        // The agent who asked files it changed: it replaces the old request.
+        $this->assertStringContainsString('Filed again', ($tool('limo')->run)(['title' => 'GPS tracker in every car, replaced by a route pick list', 'why' => 'Real route costs without hardware.', 'size' => 'Small']));
+        $this->assertSame(1, Idea::count());
+        $this->assertSame('wait', $idea->fresh()->status);
+        $this->assertSame('Small', $idea->fresh()->size);
+
+        // Only from "waiting" or "not now".
+        $idea->update(['status' => 'done']);
+        $this->actingAs($owner)->post(route('ideas.reconsider', $idea), ['reason' => 'x'])->assertSessionHasErrors('status');
+    }
+
     public function test_without_the_ai_key_the_request_waits_with_a_note(): void
     {
         $this->model->configured = false;

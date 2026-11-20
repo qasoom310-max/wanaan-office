@@ -46,6 +46,7 @@ Route::middleware(['auth', EnsurePasswordChanged::class])->group(function () {
         Route::post('facts', [FactController::class, 'store'])->name('facts.store');
         Route::post('questions/{question}/answer', [QuestionController::class, 'answer'])->name('questions.answer');
         Route::post('it/{idea}', [IdeaController::class, 'decide'])->name('ideas.decide');
+        Route::post('it/{idea}/reconsider', [IdeaController::class, 'reconsider'])->name('ideas.reconsider');
         Route::post('website-plan/{page}', [PlanController::class, 'decide'])->name('plan.decide');
         Route::get('settings', [SettingsController::class, 'edit'])->name('settings');
         Route::put('settings', [SettingsController::class, 'update'])->name('settings.update');

@@ -212,3 +212,8 @@ input.field, textarea.field { font: 14px inherit; font-family: inherit; backgrou
 .desk-tag b { display: block; font: 600 11px var(--font-sans, system-ui); color: #fff; background: rgb(10 16 22 / .72); border-bottom: 2px solid var(--c); padding: 2px 7px; border-radius: 4px; }
 .desk-tag span { display: block; font: 10px var(--font-sans, system-ui); color: #dfe8ee; text-shadow: 0 1px 3px #000; margin-top: 1px; }
 .lg-coin { background: #f5c542; } .lg-meet { background: #3fc1b6; box-shadow: 0 0 8px #3fc1b6; }
+
+.reconsider summary { list-style: none; cursor: pointer; display: inline-block; }
+.reconsider summary::-webkit-details-marker { display: none; }
+.reconsider[open] { flex-basis: 100%; }
+.reconsider form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-width: 70ch; }

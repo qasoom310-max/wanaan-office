@@ -42,7 +42,7 @@ class OfficeTools
                 ['type' => 'object', 'properties' => new \stdClass],
                 fn (): string => 'Opening the office: the IT board',
                 fn (): string => $this->json(Idea::orderBy('id')->get()
-                    ->map(fn (Idea $idea): array => ['asked_by' => $this->team->exists($idea->agent) ? $this->team->label($idea->agent) : $idea->agent, 'title' => $idea->title, 'why' => $idea->why, 'size' => $idea->size, 'status' => Idea::STATUSES[$idea->status] ?? $idea->status])->all())),
+                    ->map(fn (Idea $idea): array => ['asked_by' => $this->team->exists($idea->agent) ? $this->team->label($idea->agent) : $idea->agent, 'title' => $idea->title, 'why' => $idea->why, 'size' => $idea->size, 'status' => Idea::STATUSES[$idea->status] ?? $idea->status, 'owner_reason' => $idea->owner_reason])->all())),
             new AgentTool('office_spending', 'AI spending this month: the total, the budget, and each agent\'s share.',
                 ['type' => 'object', 'properties' => new \stdClass],
                 fn (): string => 'Opening the office: spending',
@@ -281,10 +281,20 @@ class OfficeTools
                         continue;
                     }
 
+                    // Sent back by the owner: the agent who asked may file it again, changed
+                    // to fit the owner's reason; it replaces the old request.
+                    if ($earlier->status === 'rethink' && $earlier->agent === $agent) {
+                        $earlier->update(['title' => mb_substr($title, 0, 200), 'why' => mb_substr(trim((string) ($in['why'] ?? '')), 0, 1000),
+                            'size' => in_array($in['size'] ?? null, ['Small', 'Medium', 'Large'], true) ? $in['size'] : $earlier->size, 'status' => 'wait']);
+
+                        return 'Filed again, changed, in place of the request the owner sent back; it waits for the owner.';
+                    }
+
                     return match ($earlier->status) {
                         'yes', 'ready' => 'Not filed: the owner already approved this ("'.$earlier->title.'"). It is waiting to be built; do not ask again.',
                         'building' => 'Not filed: the owner already approved this and it is being built ("'.$earlier->title.'").',
                         'done' => 'Not filed: this is already done ("'.$earlier->title.'").',
+                        'rethink' => 'Not filed: the owner sent this back ("'.$earlier->title.'") because: '.$earlier->owner_reason.' Take that into account; do not ask again as it is.',
                         'later' => 'Not filed: the owner put this off ("'.$earlier->title.'"). Do not ask again unless something important has changed; if it has, say what in the chat instead.',
                         default => 'Not filed: it is already on the IT board, waiting for the owner ("'.$earlier->title.'").',
                     };
