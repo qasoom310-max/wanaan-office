@@ -104,6 +104,11 @@ class ConnectionsTest extends TestCase
             $this->assertContains($tool, $names, $tool);
         }
         $this->assertTrue(app(Team::class)->searchesWeb('dev'));
+
+        // The Gulf Planner reads the same company numbers.
+        foreach (['erp_journal_entries', 'erp_money_in', 'erp_limousine_trips', 'erp_rental_orders'] as $tool) {
+            $this->assertContains($tool, $this->toolNames('pln'), "pln: {$tool}");
+        }
         $this->assertTrue(app(Spending::class)->isManager('dev'));
 
         $owner = User::factory()->owner()->create();
