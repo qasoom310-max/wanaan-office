@@ -8,7 +8,7 @@
             <h2 class="board-h">{{ $section['label'] }} <span class="muted">· {{ $section['ideas']->count() }}</span></h2>
             <div class="list">
                 @foreach ($section['ideas'] as $idea)
-                    <div class="row {{ in_array($status, ['wait', 'rethink'], true) ? 'wait' : ($status === 'done' ? 'done' : '') }}">
+                    <div id="idea-{{ $idea->id }}" class="row {{ in_array($status, ['wait', 'rethink'], true) ? 'wait' : ($status === 'done' ? 'done' : '') }}">
                         <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between">
                             <b>{{ $idea->title }}</b>
                             <span class="chip {{ in_array($status, ['wait', 'rethink'], true) ? 'w' : '' }}">{{ $section['label'] }}</span>
@@ -36,6 +36,21 @@
                         @endif
 
                         @can('owner')
+                            @php($said = $talk['idea:'.$idea->id] ?? 0)
+                            @if ($idea->isOpenForDiscussion() || $said > 0)
+                                <details class="thread" data-channel="idea:{{ $idea->id }}" data-open="{{ $idea->isOpenForDiscussion() ? 1 : 0 }}" @if($status === 'rethink') open @endif>
+                                    <summary>{{ $idea->isOpenForDiscussion() ? 'Discuss with '.($team->exists($idea->agent) ? $team->label($idea->agent) : $idea->agent) : 'The discussion' }} <span class="muted">· {{ $said }}</span></summary>
+                                    <div class="thread-list" aria-live="polite"><div class="muted">Loading…</div></div>
+                                    <div class="thread-working muted" hidden><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span> <span></span></div>
+                                    @if ($idea->isOpenForDiscussion())
+                                        <form class="thread-form">
+                                            <textarea class="field" name="body" rows="2" maxlength="8000" required placeholder="Ask, push back, or agree a change… (Enter to send, Shift+Enter for a new line)"></textarea>
+                                            <button class="btn" type="submit">Send</button>
+                                        </form>
+                                        <div class="muted small">When you agree, the agent updates the request here; close the topic with <b>Approve</b>. The IT Manager's requirement follows what you agreed.</div>
+                                    @endif
+                                </details>
+                            @endif
                             <div class="inline-form">
                                 @if (in_array($status, ['wait', 'rethink', 'later'], true))
                                     <form method="POST" action="{{ route('ideas.decide', $idea) }}">@csrf<input type="hidden" name="status" value="yes"><button class="btn" type="submit">Approve</button></form>

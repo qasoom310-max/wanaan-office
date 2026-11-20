@@ -64,10 +64,10 @@ class BoardAndReportsTest extends TestCase
         $this->assertSame('rethink', $idea->status);
         $this->assertSame('Trackers cost too much for 12 cars this year.', $idea->owner_reason);
 
-        // The reason and the answer are in the private chat with the Limousine Manager, for good.
-        $sent = Message::where('channel', 'direct:limo')->whereNotNull('user_id')->sole();
+        // The reason and the answer are in the request's own discussion, for good.
+        $sent = Message::where('channel', 'idea:'.$idea->id)->whereNotNull('user_id')->sole();
         $this->assertStringContainsString('Trackers cost too much', $sent->body);
-        $this->assertTrue(Message::where('channel', 'direct:limo')->where('agent', 'limo')->where('body', 'like', 'Understood.%')->exists());
+        $this->assertTrue(Message::where('channel', 'idea:'.$idea->id)->where('agent', 'limo')->where('body', 'like', 'Understood.%')->exists());
 
         $this->actingAs($owner)->get(route('ideas'))->assertOk()->assertSee('Sent back to rethink')->assertSee('Trackers cost too much');
 
@@ -84,6 +84,43 @@ class BoardAndReportsTest extends TestCase
         // Only from "waiting" or "not now".
         $idea->update(['status' => 'done']);
         $this->actingAs($owner)->post(route('ideas.reconsider', $idea), ['reason' => 'x'])->assertSessionHasErrors('status');
+    }
+
+    public function test_the_owner_discusses_a_request_with_the_agent_who_asked_then_approves_what_was_agreed(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $staff = User::factory()->create();
+        $idea = Idea::create(['agent' => 'limo', 'title' => 'GPS tracker in every car', 'why' => 'Real route costs.', 'size' => 'Large']);
+        $channel = 'idea:'.$idea->id;
+
+        // Only the owner talks requests over.
+        $this->actingAs($staff)->postJson(route('office.chat'), ['channel' => $channel, 'body' => 'Hi'])->assertForbidden();
+
+        // The agent agrees a cheaper way and changes its own request.
+        $this->model->useTools = [['office_improve_request', ['title' => 'Route pick list on every trip', 'why' => 'Route costs without hardware, as agreed.', 'size' => 'Small']]];
+        $this->model->answer = 'Agreed: a route list instead of trackers. I changed the request.';
+        $this->actingAs($owner)->postJson(route('office.chat'), ['channel' => $channel, 'body' => 'Trackers are too costly. Is there a cheaper way?'])->assertOk();
+
+        $idea->refresh();
+        $this->assertSame('Route pick list on every trip', $idea->title);
+        $this->assertSame('Small', $idea->size);
+        $this->assertStringContainsString('discussion on your IT request', $this->model->lastInstructions);
+        $this->assertSame(2, Message::where('channel', $channel)->count());
+
+        $history = $this->actingAs($owner)->getJson(route('office.history', ['channel' => $channel]))->assertOk()->json();
+        $this->assertCount(2, $history['messages']);
+        $this->assertNull($history['working']);
+
+        // Another agent never gets the tool for someone else's request.
+        $this->assertFalse(collect(app(Team::class)->toolsFor('dev', $channel, $owner->id))->contains('name', 'office_improve_request'));
+
+        // Approve closes the topic; the requirement is written from what was agreed.
+        $this->model->useTools = [];
+        $this->model->answer = '## What to build';
+        $this->actingAs($owner)->post(route('ideas.decide', $idea), ['status' => 'yes']);
+        $this->assertStringContainsString('Trackers are too costly', $this->model->lastMessages[0]['content']);
+        $this->actingAs($owner)->postJson(route('office.chat'), ['channel' => $channel, 'body' => 'One more thing'])->assertStatus(422);
+        $this->actingAs($owner)->get(route('ideas'))->assertOk()->assertSee('The discussion');
     }
 
     public function test_without_the_ai_key_the_request_waits_with_a_note(): void

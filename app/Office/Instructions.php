@@ -4,6 +4,7 @@ namespace App\Office;
 
 use App\Jobs\RunAgent;
 use App\Models\Fact;
+use App\Models\Idea;
 use App\Models\Message;
 use App\Models\Question;
 
@@ -142,9 +143,14 @@ class Instructions
                 'If it does not touch your job and you have nothing important to add, reply with exactly: '.RunAgent::READ_ONLY_REPLY,
             );
         } else {
-            $lines[] = $channel === Message::EVERYONE
-                ? 'This is the Everyone chat: the whole team reads it. The owner asked you by name.'
-                : 'This is a private chat with the owner. Do not repeat it in the Everyone chat.';
+            $idea = ($ideaId = Channels::ideaId($channel)) !== null ? Idea::find($ideaId) : null;
+            $lines[] = match (true) {
+                $idea !== null => 'This is the discussion on your IT request "'.$idea->title.'" (why: '.$idea->why.'; size: '.$idea->size.'; now: '.(Idea::STATUSES[$idea->status] ?? $idea->status).').'
+                    .($idea->owner_reason ? ' The owner\'s reason for sending it back: '.$idea->owner_reason.'.' : '')
+                    .' The owner is deciding whether to approve it. Listen to their reasons, defend what matters with facts, and offer a cheaper or simpler way when there is one. When you agree on a change, record it with office_improve_request; the owner closes the topic with Approve. If it truly cannot be done now, say so plainly.',
+                $channel === Message::EVERYONE => 'This is the Everyone chat: the whole team reads it. The owner asked you by name.',
+                default => 'This is a private chat with the owner. Do not repeat it in the Everyone chat.',
+            };
         }
 
         $month = $this->spending->thisMonth();

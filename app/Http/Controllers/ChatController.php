@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\RunAgent;
 use App\Models\AgentRun;
+use App\Models\Idea;
 use App\Models\Message;
 use App\Models\MessageFile;
 use App\Office\Channels;
@@ -44,6 +45,10 @@ class ChatController extends Controller
         ], ['files.*.mimes' => 'Pictures, PDF, Excel, CSV or text files only.', 'files.*.max' => 'Each file can be at most 10 MB.']);
 
         abort_unless($channels->isValid($data['channel']), 404);
+        if (($ideaId = Channels::ideaId($data['channel'])) !== null) {
+            abort_unless($request->user()->can('owner'), 403);
+            abort_unless(Idea::find($ideaId)?->isOpenForDiscussion(), 422, 'This request is already decided.');
+        }
 
         $ownerId = Message::isPrivate($data['channel']) ? $request->user()->id : null;
         $body = trim((string) ($data['body'] ?? ''));

@@ -4,8 +4,10 @@ namespace App\Jobs;
 
 use App\Models\AgentRun;
 use App\Models\Idea;
+use App\Models\Message;
 use App\Office\AgentModel;
 use App\Office\AgentProblem;
+use App\Office\Channels;
 use App\Office\Instructions;
 use App\Office\Spending;
 use App\Office\Team;
@@ -45,8 +47,11 @@ class WriteRequirement implements ShouldQueue
         $run = AgentRun::create(['agent' => 'it', 'channel' => 'board', 'status' => AgentRun::WORKING, 'step' => 'Writing a requirement', 'step_number' => 1, 'step_total' => 3, 'claimed_at' => now(), 'heartbeat_at' => now()]);
 
         $asker = $team->exists($idea->agent) ? $team->label($idea->agent) : $idea->agent;
+        $talk = Message::where('channel', Channels::idea($idea->id))->orderBy('id')->limit(60)->get()
+            ->map(fn (Message $message): string => '['.($message->isFromAgent() ? $team->label($message->agent) : 'Owner').'] '.$message->body)->implode("\n\n");
         $ask = "[Owner (owner)] I approved this request on the IT board. Write its requirement so Claude Code can build it without guessing.\n\n"
             ."Request: {$idea->title}\nAsked by: {$asker}\nWhy: {$idea->why}\nSize: {$idea->size}\n\n"
+            .($talk !== '' ? "The owner and {$asker} discussed it before approval. Build what they agreed; where the discussion changed the request, the discussion wins:\n\n{$talk}\n\n" : '')
             .'Use these headings: What to build · Who uses it and how · Rules and edge cases · Which system it touches (ERP, SEO system, office, website) · How to check it works · Risks and what must not break · To confirm (anything you assumed). '
             .'Look at the real data you can read before writing, and ask the colleague who asked if something is unclear. Reply with the requirement only.';
 

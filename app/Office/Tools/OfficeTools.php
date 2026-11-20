@@ -309,6 +309,38 @@ class OfficeTools
             });
     }
 
+    /**
+     * In the discussion on its own IT request, the agent who asked changes the request
+     * to what was agreed with the owner. The owner then closes it with Approve.
+     */
+    public function improveRequest(Idea $idea): AgentTool
+    {
+        return new AgentTool('office_improve_request', 'Change your IT request "'.$idea->title.'" to what you and the owner agreed in this discussion. Give only what changes. The owner then approves it (or not) on the IT board.',
+            ['type' => 'object', 'properties' => [
+                'title' => ['type' => 'string', 'description' => 'The request, in a short line.'],
+                'why' => ['type' => 'string', 'description' => 'What it would let you do better, in one or two sentences, including what was agreed.'],
+                'size' => ['type' => 'string', 'enum' => ['Small', 'Medium', 'Large']],
+            ]],
+            fn (): string => 'Improving the request',
+            function (array $in) use ($idea): string {
+                $idea->refresh();
+                if (! $idea->isOpenForDiscussion()) {
+                    return 'Not changed: the owner already decided this request ('.(Idea::STATUSES[$idea->status] ?? $idea->status).').';
+                }
+                $changes = array_filter([
+                    'title' => mb_substr(trim((string) ($in['title'] ?? '')), 0, 200),
+                    'why' => mb_substr(trim((string) ($in['why'] ?? '')), 0, 1000),
+                    'size' => in_array($in['size'] ?? null, ['Small', 'Medium', 'Large'], true) ? $in['size'] : '',
+                ], fn (string $value): bool => $value !== '');
+                if ($changes === []) {
+                    return 'Not changed: give the new title, why or size.';
+                }
+                $idea->update([...$changes, 'status' => 'wait']);
+
+                return 'Changed. It waits on the IT board for the owner\'s approval.';
+            });
+    }
+
     private function json(mixed $value): string
     {
         return (string) json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AgentRun;
 use App\Models\Message;
 use App\Models\Question;
 use App\Models\User;
@@ -76,7 +77,15 @@ class OfficeController extends Controller
         $channel = (string) $request->query('channel');
         abort_unless($channels->isValid($channel), 404);
 
-        return response()->json(['channel' => $channel, 'messages' => $this->latest($channel, $request->user(), $team)]);
+        $working = AgentRun::where('channel', $channel)
+            ->where(fn ($query) => Message::isPrivate($channel) ? $query->where('owner_id', $request->user()->id) : $query->whereNull('owner_id'))
+            ->whereIn('status', [AgentRun::WAITING, AgentRun::WORKING])->latest('id')->first();
+
+        return response()->json([
+            'channel' => $channel,
+            'messages' => $this->latest($channel, $request->user(), $team),
+            'working' => $working ? ['agent' => $team->label($working->agent), 'step' => $working->step] : null,
+        ]);
     }
 
     /**

@@ -17,9 +17,11 @@ use Illuminate\View\View;
 
 class IdeaController extends Controller
 {
-    public function index(Team $team): View
+    public function index(Request $request, Team $team): View
     {
         $ideas = Idea::orderBy('id')->get();
+        $talk = Message::where('channel', 'like', 'idea:%')->where('owner_id', $request->user()->id)
+            ->selectRaw('channel, count(*) as total')->groupBy('channel')->pluck('total', 'channel');
 
         return view('ideas.index', [
             'sections' => collect(Idea::STATUSES)->map(fn (string $label, string $status): array => [
@@ -27,6 +29,7 @@ class IdeaController extends Controller
                 'ideas' => $ideas->where('status', $status)->values(),
             ]),
             'team' => $team,
+            'talk' => $talk,
         ]);
     }
 
@@ -72,10 +75,10 @@ class IdeaController extends Controller
 
     /**
      * The owner sends a request back with the reason it cannot be done as asked. The
-     * reason goes to the agent who asked, in their private chat (kept for good), and
+     * reason goes to the agent who asked, in the request's own discussion (kept for good), and
      * they answer: a changed request that fits, or another way to get what they need.
      */
-    public function reconsider(Request $request, Idea $idea, Channels $channels, Team $team): RedirectResponse
+    public function reconsider(Request $request, Idea $idea, Team $team): RedirectResponse
     {
         $data = $request->validate(['reason' => ['required', 'string', 'max:2000']]);
 
@@ -90,13 +93,13 @@ class IdeaController extends Controller
             return back()->with('status', 'Sent back with your reason.');
         }
 
-        $channel = $channels->direct($idea->agent);
+        $channel = Channels::idea($idea->id);
         $message = Message::create([
             'channel' => $channel,
             'owner_id' => $request->user()->id,
             'user_id' => $request->user()->id,
-            'body' => "(From the IT board) About your request \"{$idea->title}\": I can't approve it as it is.\n\nWhy: {$reason}\n\n"
-                .'Take this into account. If a changed request would fit, file it again with office_request_it (it replaces this one). '
+            'body' => "I can't approve this as it is.\n\nWhy: {$reason}\n\n"
+                .'Take this into account. If a changed request would fit, change it with office_improve_request. '
                 .'If not, tell me another way to get what you need, or say plainly that it cannot be done for now.',
         ]);
 
@@ -110,6 +113,6 @@ class IdeaController extends Controller
             'heartbeat_at' => now(),
         ]));
 
-        return back()->with('status', 'Sent back to '.$team->label($idea->agent).' with your reason. Their answer is in your private chat with them.');
+        return back()->with('status', 'Sent back to '.$team->label($idea->agent).' with your reason. Their answer is in the discussion on the card.');
     }
 }

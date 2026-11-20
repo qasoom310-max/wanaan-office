@@ -30,6 +30,12 @@ class Idea extends Model
         return ['decided_at' => 'datetime', 'done_at' => 'datetime'];
     }
 
+    /** The owner and the agent who asked can still talk it over: it is not approved yet. */
+    public function isOpenForDiscussion(): bool
+    {
+        return in_array($this->status, ['wait', 'rethink', 'later'], true);
+    }
+
     /** What to paste into Claude Code to build it. */
     public function forClaudeCode(): string
     {

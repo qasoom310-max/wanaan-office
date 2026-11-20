@@ -3,6 +3,7 @@
 namespace App\Office;
 
 use App\Models\AgentName;
+use App\Models\Idea;
 use App\Office\Erp\ErpClient;
 use App\Office\Seo\SeoClient;
 use App\Office\Tools\AgentTool;
@@ -121,6 +122,10 @@ class Team
         // managers and IT may also ask IT for improvements.
         if ($channel !== null) {
             $tools[] = $office->openFile($channel, $ownerId);
+            $idea = ($ideaId = Channels::ideaId($channel)) !== null ? Idea::find($ideaId) : null;
+            if ($idea !== null && $idea->agent === $agent) {
+                $tools[] = $office->improveRequest($idea);
+            }
         }
         $tools[] = $office->askOwner($agent);
         if (($this->get($agent)['manager'] ?? false) || $agent === 'it') {
