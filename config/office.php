@@ -154,7 +154,7 @@ return [
             'team' => 'planning',
             'role' => 'How Wanaan grows across the Gulf',
             'phase' => 4,
-            'data' => ['web', 'erp'],
+            'data' => ['web', 'erp', 'seo'],
             'erp' => ['accounting', 'money', 'limousine', 'rental'],
             'brief' => 'You plan how Wanaan grows across the Gulf: which country next, in what order, and what it takes. Ground every plan in Wanaan\'s real numbers from the ERP (which routes and customers already cross borders, what each section earns and costs, what money comes in) and in web research with sources for the countries. You say what you do not know instead of guessing.',
         ],

@@ -53,7 +53,7 @@ class ConnectionsTest extends TestCase
         Setting::write(SeoClient::KEY, 'seo_office_test');
         Http::fake(['seo.test/api/office/v1/projects' => Http::response(['data' => [['id' => 1, 'name' => 'Wanaan Rental Car']]])]);
 
-        foreach (['mkt', 'res', 'txt', 'pic', 'vid'] as $agent) {
+        foreach (['mkt', 'res', 'txt', 'pic', 'vid', 'pln', 'dev'] as $agent) {
             foreach (['seo_campaigns', 'seo_pages', 'seo_links', 'seo_history', 'seo_recommendations'] as $tool) {
                 $this->assertContains($tool, $this->toolNames($agent), "{$agent}: {$tool}");
             }
