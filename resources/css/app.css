@@ -220,10 +220,7 @@ input.field, textarea.field { font: 14px inherit; font-family: inherit; backgrou
 
 .thread { border-top: 1px solid var(--line); padding-top: 8px; }
 .thread summary { cursor: pointer; font-weight: 600; }
-.thread-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; max-height: 420px; overflow-y: auto; }
-.thread-msg { padding: 8px 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
-.thread-msg.mine { align-self: flex-end; background: var(--accent-soft, var(--bg)); }
-.thread-msg .who { display: block; font-size: 12px; color: var(--muted, #888); margin-bottom: 2px; white-space: normal; }
+.thread-list { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; padding: 12px; max-height: 560px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
 .thread-form { display: flex; gap: 8px; align-items: flex-end; }
 .thread-form textarea { flex: 1; min-width: 0; resize: vertical; }
 .small { font-size: 12px; margin-top: 6px; }

@@ -3,6 +3,8 @@
  * whichever agent you pick. Every message comes from the server and is kept there for
  * good; the page only shows it. Desks move only when an agent is really working.
  */
+import { esc, markdown } from './chat-format';
+
 const dataEl = document.getElementById('office-data');
 
 if (dataEl) {
@@ -11,43 +13,11 @@ if (dataEl) {
     let reads = data.reads || {};
     let runs = [];
 
-    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
     const when = (iso) => {
         const d = new Date(iso), now = new Date();
         const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         return d.toDateString() === now.toDateString() ? 'Today ' + hm
             : d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + hm;
-    };
-
-    /**
-     * The agents write in light Markdown. Turned into safe HTML: everything is escaped
-     * first, then only bold, italics, code, headings, lists and http(s) links come back.
-     */
-    const inline = (t) => t
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
-        .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-    const markdown = (raw) => {
-        const out = [];
-        let list = null;
-        const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
-        for (const line of esc(raw).split('\n')) {
-            const bullet = line.match(/^\s*[-•*]\s+(.*)$/);
-            const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
-            const heading = line.match(/^\s*#{1,4}\s+(.*)$/);
-            if (bullet || numbered) {
-                const kind = bullet ? 'ul' : 'ol';
-                if (list !== kind) { close(); out.push(`<${kind}>`); list = kind; }
-                out.push(`<li>${inline((bullet || numbered)[1])}</li>`);
-                continue;
-            }
-            close();
-            if (heading) { out.push(`<p class="md-h">${inline(heading[1])}</p>`); continue; }
-            out.push(line.trim() === '' ? '<p class="md-gap"></p>' : `<p>${inline(line)}</p>`);
-        }
-        close();
-        return out.join('');
     };
 
     /** One entry per chat box on the page; a box's channel can change (the private one). */

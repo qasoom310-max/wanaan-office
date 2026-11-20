@@ -1,4 +1,5 @@
 import './office.js';
+import { esc, markdown } from './chat-format';
 
 // "Copy for Claude Code" and any other copy button: copies, then says so.
 document.addEventListener('click', async (e) => {
@@ -32,12 +33,13 @@ document.addEventListener('click', async (e) => {
             list.append(empty);
         }
         for (const message of data.messages) {
+            // The same bubbles and formatting as the office chats; everything is escaped first.
             const item = document.createElement('div');
-            item.className = 'thread-msg' + (message.mine ? ' mine' : '');
-            const who = document.createElement('span');
-            who.className = 'who';
-            who.textContent = message.author + ' · ' + new Date(message.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-            item.append(who, document.createTextNode(message.body));
+            item.className = 'm ' + (message.mine ? 'u' : 'a');
+            const at = new Date(message.at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            item.innerHTML = `<span class="who">${esc(message.author)}</span>`
+                + `<div class="body">${message.mine ? esc(message.body).replace(/\n/g, '<br>') : markdown(message.body)}</div>`
+                + `<span class="t">${esc(at)}</span>`;
             list.append(item);
         }
         list.scrollTop = list.scrollHeight;
